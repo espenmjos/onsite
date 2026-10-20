@@ -45,6 +45,7 @@ import androidx.media3.common.MediaItem
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.ui.PlayerView
 import android.net.Uri
+import android.view.View
 import coil.compose.AsyncImage
 import java.io.File
 import java.text.SimpleDateFormat
@@ -154,12 +155,15 @@ private fun VideoPage(file: File, isCurrent: Boolean) {
     // Pause when swiped away; start playing when this page becomes current.
     LaunchedEffect(isCurrent) { player.playWhenReady = isCurrent }
     AndroidView(
-        modifier = Modifier.fillMaxSize().padding(top = 56.dp),
+        // Keep the player's controls clear of the status bar/top bar and the system navigation bar.
+        modifier = Modifier.fillMaxSize().safeDrawingPadding().padding(top = 56.dp),
         factory = { ctx ->
             PlayerView(ctx).apply {
                 this.player = player
                 setShowNextButton(false)
                 setShowPreviousButton(false)
+                // Speed/track settings aren't useful for job videos.
+                findViewById<View>(androidx.media3.ui.R.id.exo_settings)?.visibility = View.GONE
             }
         },
     )
