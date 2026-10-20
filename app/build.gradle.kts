@@ -1,3 +1,5 @@
+import java.util.Properties
+
 plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.android")
@@ -12,13 +14,31 @@ android {
         applicationId = "no.prosjektkamera"
         minSdk = 26
         targetSdk = 34
-        versionCode = 1
-        versionName = "0.1"
+        versionCode = 2
+        versionName = "1.0.0"
+    }
+
+    // Release signing key lives outside the repo. Point ONSITE_SIGNING at a properties
+    // file (storeFile, storePassword, keyAlias, keyPassword); defaults to ~/.android-keys.
+    val signingProps = File(
+        System.getenv("ONSITE_SIGNING") ?: "${System.getProperty("user.home")}/.android-keys/onsite-release.properties"
+    )
+    signingConfigs {
+        if (signingProps.exists()) {
+            create("release") {
+                val p = Properties().apply { signingProps.inputStream().use { load(it) } }
+                storeFile = file(p.getProperty("storeFile"))
+                storePassword = p.getProperty("storePassword")
+                keyAlias = p.getProperty("keyAlias")
+                keyPassword = p.getProperty("keyPassword")
+            }
+        }
     }
 
     buildTypes {
         release {
             isMinifyEnabled = false
+            signingConfig = signingConfigs.findByName("release")
         }
     }
     compileOptions {

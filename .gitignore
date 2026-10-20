@@ -15,3 +15,8 @@ captures/
 # OS
 .DS_Store
 .kotlin/
+
+# Signing keys never belong in the repo
+*.jks
+*.keystore
+keystore.properties
