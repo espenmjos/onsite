@@ -14,7 +14,7 @@ import java.util.Date
 import java.util.Locale
 
 /**
- * All data lives as plain folders and JPEG files under Pictures/Prosjektkamera
+ * All data lives as plain folders and media files under Pictures/Onsite
  * on shared storage, so it survives uninstall and is reachable from file
  * managers and USB. The folder tree on disk *is* the data model, so a future
  * cloud sync can mirror it 1:1.
@@ -23,13 +23,29 @@ import java.util.Locale
  * unless the user opts in.
  */
 class PhotoStore(private val context: Context) {
-    val root: File = File(
-        Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_PICTURES), "Prosjektkamera"
-    )
+    private val pictures = Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_PICTURES)
+    val root: File = File(pictures, "Onsite")
     private val noMedia get() = File(root, ".nomedia")
 
-    /** Creates the root on first run and moves over photos from the old app-private location. */
+    /** Creates the root on first run and moves over files from earlier storage locations. */
     fun init() {
+        // The app used to be called Prosjektkamera.
+        val renamed = File(pictures, "Prosjektkamera")
+        if (renamed.isDirectory) {
+            if (!root.exists()) {
+                renamed.renameTo(root)
+            } else {
+                renamed.listFiles().orEmpty().forEach { src ->
+                    val dest = File(root, src.name)
+                    if (!dest.exists() && !src.renameTo(dest)) {
+                        src.copyRecursively(dest)
+                        src.deleteRecursively()
+                    }
+                }
+                renamed.delete()
+            }
+            if (visibleInGallery) scan(mediaUnder(root), force = true)
+        }
         if (!root.exists()) {
             root.mkdirs()
             noMedia.createNewFile()

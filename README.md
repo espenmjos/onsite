@@ -1,10 +1,11 @@
-# Prosjektkamera
+# Onsite
 
-Android-kamera som lagrer bilder i egne prosjektmapper, utenfor vanlig galleri.
+Android-app for foto, video og lydopptak fra oppdrag, sortert i prosjektmapper
+og holdt utenfor vanlig galleri. Logo: `docs/logo/onsite.svg` (marine #13293D + gul #FFC400).
 
-- Kotlin + Jetpack Compose + CameraX, minSdk 26
-- Data = vanlige mapper/JPEG under `Pictures/Prosjektkamera/` på intern lagring
-  (overlever avinstallering; `.nomedia` holder dem ute av galleriet, kan slås av i menyen).
+- Kotlin + Jetpack Compose + CameraX + Media3, minSdk 26
+- Data = vanlige mapper og filer (`.jpg`, `.mp4`, `.m4a`) under `Pictures/Onsite/` på intern lagring
+  (overlever avinstallering; `.nomedia` holder dem ute av galleriet, kan slås av i innstillinger).
   Krever «Tilgang til alle filer» (MANAGE_EXTERNAL_STORAGE) på Android 11+.
   Mappetreet speiles 1:1 ved fremtidig skysynk.
 

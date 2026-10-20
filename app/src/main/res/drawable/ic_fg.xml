@@ -1,12 +1,14 @@
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
     android:width="108dp" android:height="108dp"
     android:viewportWidth="108" android:viewportHeight="108">
-    <!-- folder -->
-    <path android:fillColor="#FFC94D"
-        android:pathData="M30,40h16l4,5h28a3,3 0,0 1,3,3v24a3,3 0,0 1,-3,3H30a3,3 0,0 1,-3,-3V43a3,3 0,0 1,3,-3z"/>
-    <!-- lens -->
-    <path android:fillColor="#1F5C99"
-        android:pathData="M54,60m-10,0a10,10 0,1 1,20 0a10,10 0,1 1,-20 0"/>
-    <path android:fillColor="#FFFFFF"
-        android:pathData="M54,60m-5,0a5,5 0,1 1,10 0a5,5 0,1 1,-10 0"/>
+    <!-- Same artwork as docs/logo/onsite.svg (512 units), scaled 1/6 and centred. -->
+    <group android:scaleX="0.16667" android:scaleY="0.16667"
+        android:translateX="11.33" android:translateY="9.17">
+        <path android:fillColor="#FFC400" android:pathData="M104,322 a152,152 0,0 1,304 0z" />
+        <path android:fillColor="#E0A800" android:pathData="M230,172 h52 v150 h-52z" />
+        <path android:fillColor="#FFC400" android:pathData="M102,314 h308 a26,26 0,0 1,0 52 h-308 a26,26 0,0 1,0 -52z" />
+        <path android:fillColor="#13293D" android:pathData="M256,252 m-56,0 a56,56 0,1 1,112 0 a56,56 0,1 1,-112 0z" />
+        <path android:fillColor="#FFC400" android:pathData="M256,252 m-34,0 a34,34 0,1 1,68 0 a34,34 0,1 1,-68 0z" />
+        <path android:fillColor="#13293D" android:pathData="M256,252 m-15,0 a15,15 0,1 1,30 0 a15,15 0,1 1,-30 0z" />
+    </group>
 </vector>

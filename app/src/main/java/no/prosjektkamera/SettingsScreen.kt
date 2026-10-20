@@ -86,7 +86,7 @@ fun SettingsScreen(store: PhotoStore, onClose: () -> Unit) {
             ) { store.visibleInGallery = it }
             ListItem(
                 headlineContent = { Text("Plassering") },
-                supportingContent = { Text("Interne lagring › Pictures › Prosjektkamera") },
+                supportingContent = { Text("Interne lagring › Pictures › Onsite") },
             )
             ListItem(
                 headlineContent = { Text("Brukt plass") },
@@ -97,7 +97,7 @@ fun SettingsScreen(store: PhotoStore, onClose: () -> Unit) {
 
             Section("Om")
             ListItem(
-                headlineContent = { Text("Prosjektkamera") },
+                headlineContent = { Text("Onsite") },
                 supportingContent = { Text("Versjon $appVersion") },
             )
         }

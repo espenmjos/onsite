@@ -111,7 +111,7 @@ object HardwareShutter {
 
 private enum class Mode { PHOTO, VIDEO }
 
-private val Accent = Color(0xFFFFC94D)
+private val Accent = Color(0xFFFFC400)
 private val RecordRed = Color(0xFFE53935)
 
 @Composable

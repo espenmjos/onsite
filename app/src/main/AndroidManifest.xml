@@ -4,7 +4,7 @@
     <uses-feature android:name="android.hardware.camera.any" android:required="true" />
     <uses-permission android:name="android.permission.CAMERA" />
     <uses-permission android:name="android.permission.RECORD_AUDIO" />
-    <!-- Photos live in Pictures/Prosjektkamera, which needs broad file access:
+    <!-- Photos live in Pictures/Onsite, which needs broad file access:
          legacy write permission up to Android 10, "All files access" from 11. -->
     <uses-permission
         android:name="android.permission.WRITE_EXTERNAL_STORAGE"

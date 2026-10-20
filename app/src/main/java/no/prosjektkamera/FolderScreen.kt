@@ -215,7 +215,7 @@ fun FolderScreen(
         if (isRoot && subfolders.isEmpty()) {
             Box(Modifier.fillMaxSize().padding(padding).padding(32.dp), contentAlignment = Alignment.Center) {
                 Text(
-                    "Ingen prosjekter ennå.\nTrykk på mappeknappen nede til høyre for å starte.\n\nFilene lagres i Pictures/Prosjektkamera.",
+                    "Ingen prosjekter ennå.\nTrykk på mappeknappen nede til høyre for å starte.\n\nFilene lagres i Pictures/Onsite.",
                     textAlign = TextAlign.Center,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )

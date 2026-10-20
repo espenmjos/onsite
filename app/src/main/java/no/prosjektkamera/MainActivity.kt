@@ -35,13 +35,10 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.LifecycleResumeEffect
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.darkColorScheme
-import androidx.compose.material3.lightColorScheme
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.graphics.Color
 import androidx.core.content.FileProvider
 import coil.Coil
 import coil.ImageLoader
@@ -67,11 +64,7 @@ class MainActivity : ComponentActivity() {
         )
 
         setContent {
-            val scheme = if (isSystemInDarkTheme())
-                darkColorScheme(primary = Color(0xFF9CC4F0), secondary = Color(0xFFFFC94D))
-            else
-                lightColorScheme(primary = Color(0xFF1F5C99), secondary = Color(0xFFB07D00))
-            MaterialTheme(colorScheme = scheme) {
+            MaterialTheme(colorScheme = if (isSystemInDarkTheme()) OnsiteDark else OnsiteLight) {
                 var access by remember { mutableStateOf(hasStorageAccess(this)) }
                 LifecycleResumeEffect(Unit) {
                     access = hasStorageAccess(this@MainActivity)
@@ -148,7 +141,7 @@ private fun StorageAccessScreen() {
             Text("Tilgang til lagring", style = MaterialTheme.typography.headlineSmall)
             Spacer(Modifier.height(16.dp))
             Text(
-                "Bildene lagres i Pictures/Prosjektkamera, så de ligger trygt selv om appen " +
+                "Bildene lagres i Pictures/Onsite, så de ligger trygt selv om appen " +
                     "avinstalleres. For å lage og flytte mapper der trenger appen «Tilgang til alle filer».",
                 textAlign = TextAlign.Center,
             )
