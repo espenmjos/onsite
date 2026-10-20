@@ -38,6 +38,7 @@ import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.filled.GraphicEq
 import androidx.compose.material.icons.filled.EditNote
+import androidx.compose.material.icons.outlined.Info
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.Text
@@ -88,6 +89,7 @@ fun ViewerScreen(store: PhotoStore, folder: File, initial: File, onClose: () -> 
     var confirmDelete by remember { mutableStateOf(false) }
     var moving by remember { mutableStateOf(false) }
     var editingNote by remember { mutableStateOf(false) }
+    var showDetails by remember { mutableStateOf(false) }
     val note = remember(current, version) { store.note(current) }
     // Tapping a photo hides/shows the bars, like the system gallery.
     var chrome by remember { mutableStateOf(true) }
@@ -112,6 +114,9 @@ fun ViewerScreen(store: PhotoStore, folder: File, initial: File, onClose: () -> 
             ) {
                 IconButton(onClick = onClose, modifier = Modifier.align(Alignment.CenterStart)) {
                     Icon(Icons.AutoMirrored.Filled.ArrowBack, stringResource(R.string.back), tint = Color.White)
+                }
+                IconButton(onClick = { showDetails = true }, modifier = Modifier.align(Alignment.CenterEnd)) {
+                    Icon(Icons.Outlined.Info, stringResource(R.string.details), tint = Color.White)
                 }
                 val date = Date(current.lastModified())
                 Column(Modifier.align(Alignment.Center), horizontalAlignment = Alignment.CenterHorizontally) {
@@ -166,6 +171,7 @@ fun ViewerScreen(store: PhotoStore, folder: File, initial: File, onClose: () -> 
     }
 
     if (editingNote) NoteDialog(store, current) { editingNote = false }
+    if (showDetails) DetailsSheet(store, current) { showDetails = false }
 
     if (moving) {
         MoveDialog(

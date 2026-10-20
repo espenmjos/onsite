@@ -66,7 +66,7 @@ class LocationTracker(context: Context) {
         } ?: return
         address = listOfNotNull(
             listOfNotNull(found.thoroughfare, found.subThoroughfare).joinToString(" ").ifBlank { null },
-            listOfNotNull(found.postalCode, found.locality).joinToString(" ").ifBlank { null },
+            listOfNotNull(found.postalCode, found.locality ?: found.subAdminArea).joinToString(" ").ifBlank { null },
         ).joinToString(", ").ifBlank { found.getAddressLine(0) }
         addressFor = loc
     }

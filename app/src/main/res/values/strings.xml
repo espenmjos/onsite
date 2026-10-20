@@ -159,11 +159,11 @@
     <string name="cannot_undo">This can\'t be undone.</string>
     <string name="from_location">From %1$s</string>
     <string name="moved_to_trash">Moved to the trash</string>
-    <string name="section_stamp">Photo stamp</string>
+    <string name="section_stamp">Location and stamp</string>
     <string name="stamp_enabled">Stamp photos</string>
-    <string name="stamp_desc">Date, time, location and project are written into the photo</string>
-    <string name="stamp_location">Include location</string>
-    <string name="stamp_location_desc">Address from GPS in the stamp, and GPS data in photo and video files</string>
+    <string name="stamp_desc">Write date, address and project into the photo itself</string>
+    <string name="stamp_location">Save location</string>
+    <string name="stamp_location_desc">GPS position is stored in photo and video files and shown under Details</string>
     <plurals name="delete_forever_q">
         <item quantity="one">Permanently delete %d item?</item>
         <item quantity="other">Permanently delete %d items?</item>
@@ -190,4 +190,14 @@
         <item quantity="one">Saved %1$d file to %2$s</item>
         <item quantity="other">Saved %1$d files to %2$s</item>
     </plurals>
+    <string name="details">Details</string>
+    <string name="taken">Taken</string>
+    <string name="gps_position">Location</string>
+    <string name="looking_up_address">Looking up address…</string>
+    <string name="no_location">No location saved</string>
+    <string name="open_in_maps">Open in Maps</string>
+    <string name="folder">Folder</string>
+    <string name="file">File</string>
+    <string name="resolution">Resolution</string>
+    <string name="length">Length</string>
 </resources>

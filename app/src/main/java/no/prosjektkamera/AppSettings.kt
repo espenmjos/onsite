@@ -25,8 +25,8 @@ class AppSettings private constructor(context: Context) {
     var videoQuality by pref("videoQuality", "FHD")
     var volumeShutter by pref("volumeShutter", true)
 
-    // Stamp burned into photos
-    var stampEnabled by pref("stampEnabled", true)
+    // Location saved in photo/video files (shown under Details), and an optional stamp burned into photos
+    var stampEnabled by pref("stampEnabled", false)
     var stampLocation by pref("stampLocation", true)
 
     // Audio

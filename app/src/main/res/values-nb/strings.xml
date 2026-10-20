@@ -158,11 +158,11 @@
     <string name="cannot_undo">Dette kan ikke angres.</string>
     <string name="from_location">Fra %1$s</string>
     <string name="moved_to_trash">Flyttet til papirkurven</string>
-    <string name="section_stamp">Stempel</string>
-    <string name="stamp_enabled">Stempel på bilder</string>
-    <string name="stamp_desc">Dato, klokkeslett, sted og prosjekt skrives inn i bildet</string>
-    <string name="stamp_location">Ta med posisjon</string>
-    <string name="stamp_location_desc">Adresse fra GPS i stempelet, og GPS-data i bilde- og videofiler</string>
+    <string name="section_stamp">Posisjon og stempel</string>
+    <string name="stamp_enabled">Stempel i bildet</string>
+    <string name="stamp_desc">Skriv dato, adresse og prosjekt inn i selve bildet</string>
+    <string name="stamp_location">Lagre posisjon</string>
+    <string name="stamp_location_desc">GPS-posisjon lagres i bilde- og videofiler og vises under Detaljer</string>
     <plurals name="delete_forever_q">
         <item quantity="one">Slette %d element for godt?</item>
         <item quantity="other">Slette %d elementer for godt?</item>
@@ -189,4 +189,14 @@
         <item quantity="one">Lagret %1$d fil i %2$s</item>
         <item quantity="other">Lagret %1$d filer i %2$s</item>
     </plurals>
+    <string name="details">Detaljer</string>
+    <string name="taken">Tatt</string>
+    <string name="gps_position">Posisjon</string>
+    <string name="looking_up_address">Finner adresse …</string>
+    <string name="no_location">Ingen posisjon lagret</string>
+    <string name="open_in_maps">Åpne i kart</string>
+    <string name="folder">Mappe</string>
+    <string name="file">Fil</string>
+    <string name="resolution">Oppløsning</string>
+    <string name="length">Lengde</string>
 </resources>
