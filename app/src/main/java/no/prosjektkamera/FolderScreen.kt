@@ -33,6 +33,7 @@ import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.PhotoCamera
 import androidx.compose.material.icons.filled.Share
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Checkbox
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -149,7 +150,20 @@ fun FolderScreen(
                         IconButton(onClick = { dialog = FolderDialog.Create }) {
                             Icon(Icons.Default.CreateNewFolder, "Ny mappe")
                         }
-                        if (!isRoot) {
+                        if (isRoot) {
+                            Box {
+                                IconButton(onClick = { menuOpen = true }) {
+                                    Icon(Icons.Default.MoreVert, "Mer")
+                                }
+                                DropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
+                                    val visible = remember(version) { store.visibleInGallery }
+                                    DropdownMenuItem(
+                                        text = { Text("Vis bildene i Galleri") },
+                                        trailingIcon = { Checkbox(checked = visible, onCheckedChange = null) },
+                                        onClick = { menuOpen = false; store.visibleInGallery = !visible })
+                                }
+                            }
+                        } else {
                             Box {
                                 IconButton(onClick = { menuOpen = true }) {
                                     Icon(Icons.Default.MoreVert, "Mer")
@@ -190,7 +204,7 @@ fun FolderScreen(
         if (subfolders.isEmpty() && photos.isEmpty()) {
             Box(Modifier.fillMaxSize().padding(padding).padding(32.dp), contentAlignment = Alignment.Center) {
                 Text(
-                    if (isRoot) "Ingen prosjekter ennå.\nTrykk «Nytt prosjekt» for å starte."
+                    if (isRoot) "Ingen prosjekter ennå.\nTrykk «Nytt prosjekt» for å starte.\n\nBildene lagres i Pictures/Prosjektkamera."
                     else "Tom mappe.\nTa bilder her, eller lag undermapper med mappe-ikonet øverst.",
                     textAlign = TextAlign.Center,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,

@@ -127,7 +127,7 @@ private fun CameraContent(store: PhotoStore, folder: File, onClose: () -> Unit, 
                     busy = false
                     last = file
                     taken++
-                    store.photoSaved()
+                    store.photoSaved(file)
                 }
 
                 override fun onError(e: ImageCaptureException) {
