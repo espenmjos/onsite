@@ -33,6 +33,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.graphics.Color
@@ -48,7 +49,16 @@ import java.io.File
  * [exclude] (in its parent) since that's usually where the target is.
  */
 @Composable
-fun MoveDialog(store: PhotoStore, exclude: File, onDismiss: () -> Unit, onPick: (File) -> Unit) {
+fun MoveDialog(
+    store: PhotoStore,
+    exclude: File,
+    onDismiss: () -> Unit,
+    /** Folders being moved: they can't be entered, since a folder can't go inside itself. */
+    blocked: Set<File> = emptySet(),
+    /** Folders may be moved to the top level (becoming projects); files may not. */
+    allowRoot: Boolean = false,
+    onPick: (File) -> Unit,
+) {
     val context = LocalContext.current
     var current by remember { mutableStateOf(exclude.parentFile?.takeIf { it.startsWith(store.root) } ?: store.root) }
     var creating by remember { mutableStateOf(false) }
@@ -91,8 +101,10 @@ fun MoveDialog(store: PhotoStore, exclude: File, onDismiss: () -> Unit, onPick: 
                         items(children, key = { it.path }) { dir ->
                             val hasChildren = remember(dir, version) { store.subfolders(dir).isNotEmpty() }
                             val count = remember(dir, version) { store.media(dir).size }
+                            val isBlocked = dir in blocked
                             ListItem(
-                                modifier = Modifier.clickable { current = dir },
+                                modifier = Modifier.clickable(enabled = !isBlocked) { current = dir }
+                                    .alpha(if (isBlocked) 0.4f else 1f),
                                 colors = ListItemDefaults.colors(containerColor = Color.Transparent),
                                 leadingContent = {
                                     Icon(Icons.Default.Folder, null, tint = MaterialTheme.colorScheme.secondary)
@@ -119,7 +131,7 @@ fun MoveDialog(store: PhotoStore, exclude: File, onDismiss: () -> Unit, onPick: 
             }
         },
         confirmButton = {
-            Button(enabled = !isRoot && !isSource, onClick = { onPick(current) }) { Text(stringResource(R.string.move_here)) }
+            Button(enabled = (!isRoot || allowRoot) && !isSource, onClick = { onPick(current) }) { Text(stringResource(R.string.move_here)) }
         },
         dismissButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.cancel)) } },
     )

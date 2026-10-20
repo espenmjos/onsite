@@ -34,6 +34,7 @@ import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.PhotoCamera
 import androidx.compose.material.icons.filled.PlayCircle
 import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.filled.SelectAll
 import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material.icons.filled.GraphicEq
 import androidx.compose.material.icons.filled.ChevronRight
@@ -45,6 +46,7 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.ListItem
+import androidx.compose.material3.ListItemDefaults
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
@@ -153,7 +155,14 @@ fun FolderScreen(
                 },
                 actions = {
                     if (selecting) {
-                        IconButton(onClick = { context.sharePhotos(selected.toList()) }) {
+                        IconButton(onClick = { selected = (subfolders + photos).toSet() }) {
+                            Icon(Icons.Default.SelectAll, stringResource(R.string.select_all))
+                        }
+                        IconButton(onClick = {
+                            val files = store.mediaIn(selected)
+                            if (files.isEmpty()) toast(context.getString(R.string.nothing_to_share))
+                            else context.sharePhotos(files)
+                        }) {
                             Icon(Icons.Default.Share, stringResource(R.string.share))
                         }
                         IconButton(onClick = { dialog = FolderDialog.Move }) {
@@ -239,7 +248,15 @@ fun FolderScreen(
                 item(key = "header", span = { GridItemSpan(maxLineSpan) }) { FolderHeader(info) }
             }
             items(subfolders, key = { "d:" + it.path }, span = { GridItemSpan(maxLineSpan) }) { dir ->
-                FolderRow(dir, infos.getValue(dir), enabled = !selecting) { onOpenFolder(dir) }
+                val isSel = dir in selected
+                FolderRow(
+                    dir, infos.getValue(dir), selected = isSel,
+                    onClick = {
+                        if (selecting) selected = if (isSel) selected - dir else selected + dir
+                        else onOpenFolder(dir)
+                    },
+                    onLongClick = { selected = selected + dir },
+                )
             }
             if (!isRoot && subfolders.isEmpty() && photos.isEmpty()) {
                 item(key = "empty", span = { GridItemSpan(maxLineSpan) }) {
@@ -355,21 +372,29 @@ fun FolderScreen(
                 onConfirm = { dialog = null; onUp(); store.deleteFolder(folder) },
             )
         }
-        FolderDialog.DeletePhotos -> ConfirmDialog(
-            title = pluralStringResource(R.plurals.delete_n_files_q, selected.size, selected.size),
-            text = stringResource(R.string.files_deleted_permanently),
-            onDismiss = { dialog = null },
-            onConfirm = { store.deletePhotos(selected); selected = emptySet(); dialog = null },
-        )
+        FolderDialog.DeletePhotos -> {
+            val hasFolders = selected.any { it.isDirectory }
+            val n = remember(selected) { store.mediaIn(selected).size }
+            ConfirmDialog(
+                title = if (hasFolders) stringResource(R.string.delete_selected_q)
+                else pluralStringResource(R.plurals.delete_n_files_q, selected.size, selected.size),
+                text = if (hasFolders) pluralStringResource(R.plurals.delete_selected_body, n, n)
+                else stringResource(R.string.files_deleted_permanently),
+                onDismiss = { dialog = null },
+                onConfirm = { store.deleteItems(selected); selected = emptySet(); dialog = null },
+            )
+        }
         FolderDialog.Move -> MoveDialog(
             store = store,
             exclude = folder,
+            blocked = selected.filter { it.isDirectory }.toSet(),
+            allowRoot = selected.all { it.isDirectory },
             onDismiss = { dialog = null },
             onPick = { dest ->
-                val n = selected.size
-                store.movePhotos(selected, dest)
+                store.moveItems(selected, dest)
                 selected = emptySet(); dialog = null
-                toast(context.resources.getQuantityString(R.plurals.moved_n_files_to, n, n, dest.name))
+                val name = if (dest == store.root) context.getString(R.string.projects) else dest.name
+                toast(context.getString(R.string.moved_to, name))
             },
         )
         null -> {}
@@ -393,10 +418,19 @@ private fun FolderHeader(info: PhotoStore.FolderInfo) {
     }
 }
 
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
-private fun FolderRow(dir: File, info: PhotoStore.FolderInfo, enabled: Boolean, onClick: () -> Unit) {
+private fun FolderRow(
+    dir: File,
+    info: PhotoStore.FolderInfo,
+    selected: Boolean,
+    onClick: () -> Unit,
+    onLongClick: () -> Unit,
+) {
     ListItem(
-        modifier = Modifier.clickable(enabled = enabled, onClick = onClick),
+        modifier = Modifier.combinedClickable(onClick = onClick, onLongClick = onLongClick),
+        colors = if (selected) ListItemDefaults.colors(containerColor = MaterialTheme.colorScheme.secondaryContainer)
+        else ListItemDefaults.colors(),
         leadingContent = {
             Box(
                 Modifier.size(56.dp).clip(MaterialTheme.shapes.medium)
@@ -410,6 +444,14 @@ private fun FolderRow(dir: File, info: PhotoStore.FolderInfo, enabled: Boolean, 
                     )
                 } else {
                     Icon(Icons.Default.Folder, null, tint = MaterialTheme.colorScheme.secondary)
+                }
+                if (selected) {
+                    Box(
+                        Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.45f)),
+                        contentAlignment = Alignment.Center,
+                    ) {
+                        Icon(Icons.Default.CheckCircle, null, tint = MaterialTheme.colorScheme.primaryContainer)
+                    }
                 }
             }
         },

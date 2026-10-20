@@ -176,22 +176,31 @@ class PhotoStore(private val context: Context) {
         changed()
     }
 
-    fun deletePhotos(files: Collection<File>) {
-        files.forEach { it.delete() }
-        scan(files.toList())
+    /** All media files in [items], expanding folders recursively. */
+    fun mediaIn(items: Collection<File>): List<File> =
+        items.flatMap { if (it.isDirectory) mediaUnder(it) else listOf(it) }
+
+    /** Deletes files and/or whole folders. */
+    fun deleteItems(items: Collection<File>) {
+        val gone = mediaIn(items)
+        items.forEach { if (it.isDirectory) it.deleteRecursively() else it.delete() }
+        scan(gone)
         changed()
     }
 
-    fun movePhotos(files: Collection<File>, dest: File) {
-        val targets = files.map { f ->
-            val target = uniqueFile(dest, f.nameWithoutExtension, f.extension)
+    /** Moves files and/or whole folders into [dest], renaming on name clashes. */
+    fun moveItems(items: Collection<File>, dest: File) {
+        val before = mediaIn(items)
+        val targets = items.map { f ->
+            val target = if (f.isDirectory) uniqueDir(dest, f.name)
+            else uniqueFile(dest, f.nameWithoutExtension, f.extension)
             if (!f.renameTo(target)) {
-                f.copyTo(target)
-                f.delete()
+                f.copyRecursively(target)
+                f.deleteRecursively()
             }
             target
         }
-        scan(files.toList() + targets)
+        scan(before + mediaIn(targets))
         changed()
     }
 
@@ -207,6 +216,13 @@ class PhotoStore(private val context: Context) {
     fun mediaSaved(file: File) {
         scan(listOf(file))
         changed()
+    }
+
+    private fun uniqueDir(parent: File, name: String): File {
+        var f = File(parent, name)
+        var i = 2
+        while (f.exists()) f = File(parent, "$name (${i++})")
+        return f
     }
 
     private fun uniqueFile(dir: File, base: String, ext: String): File {

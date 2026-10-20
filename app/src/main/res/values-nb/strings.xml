@@ -135,4 +135,11 @@
         <item quantity="one">%1$d fil · %2$s</item>
         <item quantity="other">%1$d filer · %2$s</item>
     </plurals>
+    <string name="select_all">Velg alle</string>
+    <string name="delete_selected_q">Slette valgte?</string>
+    <string name="nothing_to_share">Ingen filer å dele</string>
+    <plurals name="delete_selected_body">
+        <item quantity="one">Alt i de valgte mappene slettes også – %d fil totalt.</item>
+        <item quantity="other">Alt i de valgte mappene slettes også – %d filer totalt.</item>
+    </plurals>
 </resources>

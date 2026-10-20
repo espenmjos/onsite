@@ -149,7 +149,7 @@ fun ViewerScreen(store: PhotoStore, folder: File, initial: File, onClose: () -> 
             onDismiss = { moving = false },
             onPick = { dest ->
                 moving = false
-                store.movePhotos(listOf(current), dest)
+                store.moveItems(listOf(current), dest)
                 Toast.makeText(context, context.getString(R.string.moved_to, dest.name), Toast.LENGTH_SHORT).show()
             },
         )
@@ -164,7 +164,7 @@ fun ViewerScreen(store: PhotoStore, folder: File, initial: File, onClose: () -> 
             },
             text = stringResource(R.string.file_deleted_permanently),
             onDismiss = { confirmDelete = false },
-            onConfirm = { confirmDelete = false; store.deletePhotos(listOf(current)) },
+            onConfirm = { confirmDelete = false; store.deleteItems(listOf(current)) },
         )
     }
 }

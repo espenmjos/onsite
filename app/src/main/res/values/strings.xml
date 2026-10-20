@@ -136,4 +136,11 @@
         <item quantity="one">%1$d file · %2$s</item>
         <item quantity="other">%1$d files · %2$s</item>
     </plurals>
+    <string name="select_all">Select all</string>
+    <string name="delete_selected_q">Delete selected?</string>
+    <string name="nothing_to_share">No files to share</string>
+    <plurals name="delete_selected_body">
+        <item quantity="one">Everything in the selected folders is deleted too – %d file in total.</item>
+        <item quantity="other">Everything in the selected folders is deleted too – %d files in total.</item>
+    </plurals>
 </resources>
