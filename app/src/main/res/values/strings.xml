@@ -200,4 +200,9 @@
     <string name="file">File</string>
     <string name="resolution">Resolution</string>
     <string name="length">Length</string>
+    <string name="edit_address">Edit address</string>
+    <string name="add_address">Add address</string>
+    <string name="address_hint">Address</string>
+    <string name="reset_to_gps">Use GPS address</string>
+    <string name="edited_manually">Edited manually</string>
 </resources>

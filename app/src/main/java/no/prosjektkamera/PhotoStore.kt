@@ -115,12 +115,27 @@ class PhotoStore(private val context: Context) {
         changed()
     }
 
-    /** Moves [from]'s note (if any) along to [to]. */
-    private fun moveNote(from: File, to: File) {
-        if (from.isDirectory || to.isDirectory) return // folder notes live inside the folder
-        val src = noteFile(from)
-        if (src.exists()) {
-            val dst = noteFile(to)
+    /** A manually corrected address for a photo/video, overriding the GPS lookup. */
+    private fun addressFile(item: File) = File(item.parentFile, ".${item.name}.adresse.txt")
+
+    fun customAddress(item: File): String? =
+        addressFile(item).takeIf { it.exists() }?.readText()?.trim()?.takeIf { it.isNotEmpty() }
+
+    fun setCustomAddress(item: File, text: String?) {
+        val f = addressFile(item)
+        if (text.isNullOrBlank()) f.delete() else f.writeText(text.trim())
+        changed()
+    }
+
+    /**
+     * Moves a file's sidecars (".NAME.notat.txt", ".NAME.adresse.txt", …) along to [to].
+     * Folders need nothing: their sidecars live inside them.
+     */
+    private fun moveSidecars(fromDir: File, fromName: String, to: File) {
+        if (to.isDirectory) return
+        val prefix = ".$fromName."
+        fromDir.listFiles { f -> f.isFile && f.name.startsWith(prefix) }.orEmpty().forEach { src ->
+            val dst = File(to.parentFile, ".${to.name}." + src.name.removePrefix(prefix))
             if (!src.renameTo(dst)) { src.copyTo(dst, overwrite = true); src.delete() }
         }
     }
@@ -171,7 +186,7 @@ class PhotoStore(private val context: Context) {
             from.copyRecursively(to)
             from.deleteRecursively()
         }
-        moveNote(from, to)
+        moveSidecars(from.parentFile!!, from.name, to)
     }
 
     fun relativePath(dir: File): String = dir.relativeTo(root).path

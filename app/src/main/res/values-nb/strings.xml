@@ -199,4 +199,9 @@
     <string name="file">Fil</string>
     <string name="resolution">Oppløsning</string>
     <string name="length">Lengde</string>
+    <string name="edit_address">Rediger adresse</string>
+    <string name="add_address">Legg til adresse</string>
+    <string name="address_hint">Adresse</string>
+    <string name="reset_to_gps">Bruk GPS-adresse</string>
+    <string name="edited_manually">Endret manuelt</string>
 </resources>

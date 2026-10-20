@@ -32,6 +32,19 @@ import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.produceState
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.material.icons.filled.Edit
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.OutlinedTextField
+import androidx.compose.material3.TextButton
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
@@ -116,6 +129,10 @@ fun DetailsSheet(store: PhotoStore, file: File, onDismiss: () -> Unit) {
     val address by produceState<String?>(null, d?.lat, d?.lon) {
         if (d?.lat != null && d.lon != null) value = lookUpAddress(context, d.lat, d.lon)
     }
+    val version = store.version.intValue
+    val custom = remember(file, version) { store.customAddress(file) }
+    var editing by remember { mutableStateOf(false) }
+    val hasGps = d?.lat != null && d.lon != null
 
     ModalBottomSheet(onDismissRequest = onDismiss) {
         Column(
@@ -128,16 +145,29 @@ fun DetailsSheet(store: PhotoStore, file: File, onDismiss: () -> Unit) {
             DetailRow(Icons.Default.CalendarMonth, stringResource(R.string.taken),
                 formatDateTime(context, d.taken ?: file.lastModified()))
 
-            DetailRow(Icons.Default.Place, stringResource(R.string.gps_position),
-                if (d.lat != null && d.lon != null) {
-                    val coords = String.format(Locale.ROOT, "%.5f, %.5f", d.lat, d.lon)
-                    (address ?: stringResource(R.string.looking_up_address)) + "\n" + coords
-                } else stringResource(R.string.no_location),
+            val coords = if (hasGps) String.format(Locale.ROOT, "%.5f, %.5f", d.lat, d.lon) else null
+            DetailRow(
+                Icons.Default.Place, stringResource(R.string.gps_position),
+                when {
+                    custom != null -> custom + "\n" + stringResource(R.string.edited_manually)
+                    coords != null -> (address ?: stringResource(R.string.looking_up_address)) + "\n" + coords
+                    else -> stringResource(R.string.no_location)
+                },
+                trailing = {
+                    IconButton(onClick = { editing = true }) {
+                        Icon(
+                            Icons.Default.Edit,
+                            stringResource(if (custom == null && !hasGps) R.string.add_address else R.string.edit_address),
+                        )
+                    }
+                },
             )
-            if (d.lat != null && d.lon != null) {
+            if (custom != null || hasGps) {
                 OutlinedButton(
                     onClick = {
-                        val geo = Uri.parse("geo:${d.lat},${d.lon}?q=${d.lat},${d.lon}")
+                        // A corrected address wins over the raw GPS position.
+                        val geo = if (custom != null) Uri.parse("geo:0,0?q=" + Uri.encode(custom))
+                        else Uri.parse("geo:${d.lat},${d.lon}?q=${d.lat},${d.lon}")
                         runCatching { context.startActivity(Intent(Intent.ACTION_VIEW, geo)) }
                     },
                     modifier = Modifier.padding(start = 40.dp, top = 4.dp),
@@ -159,15 +189,57 @@ fun DetailsSheet(store: PhotoStore, file: File, onDismiss: () -> Unit) {
             d.camera?.let { DetailRow(Icons.Default.CameraAlt, stringResource(R.string.camera), it) }
         }
     }
+
+    if (editing) {
+        AddressDialog(
+            initial = custom ?: address.orEmpty(),
+            canReset = custom != null && hasGps,
+            onDismiss = { editing = false },
+            onSave = { store.setCustomAddress(file, it); editing = false },
+        )
+    }
 }
 
 @Composable
-private fun DetailRow(icon: ImageVector, label: String, value: String) {
+private fun DetailRow(
+    icon: ImageVector,
+    label: String,
+    value: String,
+    trailing: (@Composable () -> Unit)? = null,
+) {
     Row(Modifier.fillMaxWidth().padding(top = 16.dp), verticalAlignment = Alignment.Top) {
         Icon(icon, null, tint = MaterialTheme.colorScheme.onSurfaceVariant, modifier = Modifier.padding(end = 16.dp, top = 2.dp))
-        Column {
+        Column(Modifier.weight(1f)) {
             Text(label, style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
             Text(value, style = MaterialTheme.typography.bodyLarge)
         }
+        trailing?.invoke()
     }
+}
+
+@Composable
+private fun AddressDialog(initial: String, canReset: Boolean, onDismiss: () -> Unit, onSave: (String?) -> Unit) {
+    var text by remember { mutableStateOf(initial) }
+    val focus = remember { FocusRequester() }
+    LaunchedEffect(Unit) { focus.requestFocus() }
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(stringResource(R.string.edit_address)) },
+        text = {
+            OutlinedTextField(
+                value = text, onValueChange = { text = it },
+                label = { Text(stringResource(R.string.address_hint)) },
+                minLines = 2,
+                keyboardOptions = KeyboardOptions(capitalization = KeyboardCapitalization.Words),
+                modifier = Modifier.fillMaxWidth().focusRequester(focus),
+            )
+        },
+        confirmButton = { TextButton(onClick = { onSave(text) }) { Text(stringResource(R.string.save)) } },
+        dismissButton = {
+            Row {
+                if (canReset) TextButton(onClick = { onSave(null) }) { Text(stringResource(R.string.reset_to_gps)) }
+                TextButton(onClick = onDismiss) { Text(stringResource(R.string.cancel)) }
+            }
+        },
+    )
 }
