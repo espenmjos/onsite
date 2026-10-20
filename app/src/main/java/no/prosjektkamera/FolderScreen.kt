@@ -47,7 +47,6 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.ListItem
 import androidx.compose.material3.FloatingActionButton
-import androidx.compose.material3.SmallFloatingActionButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
@@ -204,13 +203,12 @@ fun FolderScreen(
                 }
             } else {
                 Column(horizontalAlignment = Alignment.End, verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                    SmallFloatingActionButton(onClick = { recordingAudio = true }) {
+                    FloatingActionButton(onClick = { recordingAudio = true }) {
                         Icon(Icons.Default.Mic, "Lydopptak")
                     }
-                    ExtendedFloatingActionButton(
-                        onClick = onOpenCamera,
-                        icon = { Icon(Icons.Default.PhotoCamera, null) },
-                        text = { Text("Kamera") })
+                    FloatingActionButton(onClick = onOpenCamera) {
+                        Icon(Icons.Default.PhotoCamera, "Kamera")
+                    }
                 }
             }
         },
