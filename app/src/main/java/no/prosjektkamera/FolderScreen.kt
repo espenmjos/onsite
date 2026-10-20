@@ -467,7 +467,7 @@ fun ConfirmDialog(title: String, text: String, onDismiss: () -> Unit, onConfirm:
 }
 
 @Composable
-private fun MoveDialog(store: PhotoStore, exclude: File, onDismiss: () -> Unit, onPick: (File) -> Unit) {
+fun MoveDialog(store: PhotoStore, exclude: File, onDismiss: () -> Unit, onPick: (File) -> Unit) {
     val folders = remember { store.allFolders().filter { it != exclude } }
     AlertDialog(
         onDismissRequest = onDismiss,

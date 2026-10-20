@@ -1,6 +1,20 @@
 package no.prosjektkamera
 
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.WindowInsetsSides
+import androidx.compose.foundation.layout.only
+import androidx.compose.foundation.layout.safeDrawing
+import androidx.compose.foundation.layout.windowInsetsPadding
+import androidx.compose.material.icons.automirrored.filled.DriveFileMove
+import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.vector.ImageVector
+import android.widget.Toast
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.gestures.calculatePan
@@ -70,6 +84,9 @@ fun ViewerScreen(store: PhotoStore, folder: File, initial: File, onClose: () -> 
     val pager = rememberPagerState(initialPage = photos.indexOf(initial).coerceAtLeast(0)) { photos.size }
     val current = photos.getOrNull(pager.currentPage) ?: photos.last()
     var confirmDelete by remember { mutableStateOf(false) }
+    var moving by remember { mutableStateOf(false) }
+    // Tapping a photo hides/shows the bars, like the system gallery.
+    var chrome by remember { mutableStateOf(true) }
 
     Box(Modifier.fillMaxSize().background(Color.Black)) {
         HorizontalPager(state = pager, modifier = Modifier.fillMaxSize(), key = { photos[it].path }) { page ->
@@ -77,29 +94,64 @@ fun ViewerScreen(store: PhotoStore, folder: File, initial: File, onClose: () -> 
             when {
                 file.isVideo -> VideoPage(file, isCurrent = page == pager.currentPage)
                 file.isAudio -> AudioPage(file, isCurrent = page == pager.currentPage)
-                else -> ZoomableImage(file)
+                else -> ZoomableImage(file, onTap = { chrome = !chrome })
             }
         }
-        Row(
-            Modifier.fillMaxWidth().background(Color.Black.copy(alpha = 0.4f)).safeDrawingPadding().padding(4.dp),
-            verticalAlignment = Alignment.CenterVertically,
+
+        // ---- Top: back + date ----
+        AnimatedVisibility(chrome || !current.isPhoto, enter = fadeIn(), exit = fadeOut()) {
+            Box(
+                Modifier.fillMaxWidth().background(Color.Black.copy(alpha = 0.5f))
+                    .windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Top + WindowInsetsSides.Horizontal))
+                    .padding(4.dp),
+            ) {
+                IconButton(onClick = onClose, modifier = Modifier.align(Alignment.CenterStart)) {
+                    Icon(Icons.AutoMirrored.Filled.ArrowBack, "Tilbake", tint = Color.White)
+                }
+                val date = Date(current.lastModified())
+                Column(Modifier.align(Alignment.Center), horizontalAlignment = Alignment.CenterHorizontally) {
+                    Text(
+                        SimpleDateFormat("d. MMM yyyy", Locale("nb")).format(date),
+                        color = Color.White, style = MaterialTheme.typography.titleMedium,
+                    )
+                    Text(
+                        SimpleDateFormat("HH:mm", Locale("nb")).format(date) +
+                            "  ·  ${pager.currentPage + 1} av ${photos.size}",
+                        color = Color.White.copy(alpha = 0.8f), style = MaterialTheme.typography.bodySmall,
+                    )
+                }
+            }
+        }
+
+        // ---- Bottom: actions ----
+        AnimatedVisibility(
+            chrome || !current.isPhoto, enter = fadeIn(), exit = fadeOut(),
+            modifier = Modifier.align(Alignment.BottomCenter),
         ) {
-            IconButton(onClick = onClose) {
-                Icon(Icons.AutoMirrored.Filled.ArrowBack, "Tilbake", tint = Color.White)
-            }
-            Text(
-                SimpleDateFormat("d. MMM yyyy HH:mm", Locale("nb")).format(Date(current.lastModified())) +
-                    "  ·  ${pager.currentPage + 1}/${photos.size}",
-                color = Color.White, maxLines = 1, overflow = TextOverflow.Ellipsis,
-                modifier = Modifier.weight(1f),
-            )
-            IconButton(onClick = { context.sharePhotos(listOf(current)) }) {
-                Icon(Icons.Default.Share, "Del", tint = Color.White)
-            }
-            IconButton(onClick = { confirmDelete = true }) {
-                Icon(Icons.Default.Delete, "Slett", tint = Color.White)
+            Row(
+                Modifier.fillMaxWidth().background(Color.Black.copy(alpha = 0.5f))
+                    .windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Bottom + WindowInsetsSides.Horizontal))
+                    .padding(vertical = 6.dp),
+                horizontalArrangement = Arrangement.SpaceEvenly,
+            ) {
+                BottomAction(Icons.Default.Share, "Del") { context.sharePhotos(listOf(current)) }
+                BottomAction(Icons.AutoMirrored.Filled.DriveFileMove, "Flytt til") { moving = true }
+                BottomAction(Icons.Default.Delete, "Slett") { confirmDelete = true }
             }
         }
+    }
+
+    if (moving) {
+        MoveDialog(
+            store = store,
+            exclude = folder,
+            onDismiss = { moving = false },
+            onPick = { dest ->
+                moving = false
+                store.movePhotos(listOf(current), dest)
+                Toast.makeText(context, "Flyttet til ${dest.name}", Toast.LENGTH_SHORT).show()
+            },
+        )
     }
 
     if (confirmDelete) {
@@ -117,13 +169,25 @@ fun ViewerScreen(store: PhotoStore, folder: File, initial: File, onClose: () -> 
 }
 
 @Composable
-private fun ZoomableImage(file: File) {
+private fun BottomAction(icon: ImageVector, label: String, onClick: () -> Unit) {
+    Column(
+        Modifier.clip(MaterialTheme.shapes.medium).clickable(onClick = onClick)
+            .padding(horizontal = 20.dp, vertical = 6.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+    ) {
+        Icon(icon, label, tint = Color.White)
+        Text(label, color = Color.White, style = MaterialTheme.typography.labelMedium)
+    }
+}
+
+@Composable
+private fun ZoomableImage(file: File, onTap: () -> Unit) {
     var scale by remember { mutableFloatStateOf(1f) }
     var offset by remember { mutableStateOf(Offset.Zero) }
     Box(
         Modifier.fillMaxSize()
             .pointerInput(Unit) {
-                detectTapGestures(onDoubleTap = {
+                detectTapGestures(onTap = { onTap() }, onDoubleTap = {
                     if (scale > 1f) { scale = 1f; offset = Offset.Zero } else scale = 2.5f
                 })
             }
@@ -174,7 +238,7 @@ private fun rememberPlayer(file: File, isCurrent: Boolean, autoPlay: Boolean): E
 private fun AudioPage(file: File, isCurrent: Boolean) {
     val player = rememberPlayer(file, isCurrent, autoPlay = false)
     Column(
-        Modifier.fillMaxSize().safeDrawingPadding().padding(top = 56.dp),
+        Modifier.fillMaxSize().safeDrawingPadding().padding(top = 56.dp, bottom = 64.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
     ) {
         Spacer(Modifier.weight(1f))
@@ -208,7 +272,7 @@ private fun VideoPage(file: File, isCurrent: Boolean) {
     val player = rememberPlayer(file, isCurrent, autoPlay = true)
     AndroidView(
         // Keep the player's controls clear of the status bar/top bar and the system navigation bar.
-        modifier = Modifier.fillMaxSize().safeDrawingPadding().padding(top = 56.dp),
+        modifier = Modifier.fillMaxSize().safeDrawingPadding().padding(top = 56.dp, bottom = 64.dp),
         factory = { ctx ->
             PlayerView(ctx).apply {
                 this.player = player
