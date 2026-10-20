@@ -35,8 +35,8 @@
     <string name="empty_root">No projects yet.\nTap the folder button at the bottom right to get started.\n\nFiles are saved in Pictures/Onsite.</string>
     <string name="empty_folder">Empty folder.\nTake photos, video or voice notes here, or create subfolders with the folder icon at the top.</string>
     <string name="delete_folder_q">Delete “%1$s”?</string>
-    <string name="files_deleted_permanently">The files will be permanently deleted.</string>
-    <string name="file_deleted_permanently">The file will be permanently deleted.</string>
+    <string name="files_deleted_permanently">They\'re moved to the trash and can be restored for 30 days.</string>
+    <string name="file_deleted_permanently">It\'s moved to the trash and can be restored for 30 days.</string>
     <string name="delete_photo_q">Delete this photo?</string>
     <string name="delete_video_q">Delete this video?</string>
     <string name="delete_audio_q">Delete this voice note?</string>
@@ -125,8 +125,8 @@
         <item quantity="other">Delete %d files?</item>
     </plurals>
     <plurals name="delete_folder_body">
-        <item quantity="one">The folder, all subfolders and %d file will be permanently deleted.</item>
-        <item quantity="other">The folder, all subfolders and %d files will be permanently deleted.</item>
+        <item quantity="one">The folder and everything in it (%d file) is moved to the trash, where it can be restored for 30 days.</item>
+        <item quantity="other">The folder and everything in it (%d files) is moved to the trash, where it can be restored for 30 days.</item>
     </plurals>
     <plurals name="moved_n_files_to">
         <item quantity="one">Moved %1$d file to %2$s</item>
@@ -140,7 +140,40 @@
     <string name="delete_selected_q">Delete selected?</string>
     <string name="nothing_to_share">No files to share</string>
     <plurals name="delete_selected_body">
-        <item quantity="one">Everything in the selected folders is deleted too – %d file in total.</item>
-        <item quantity="other">Everything in the selected folders is deleted too – %d files in total.</item>
+        <item quantity="one">Everything in the selected folders goes too – %d file in total. Can be restored from the trash for 30 days.</item>
+        <item quantity="other">Everything in the selected folders goes too – %d files in total. Can be restored from the trash for 30 days.</item>
+    </plurals>
+    <string name="note">Note</string>
+    <string name="add_note">Add note</string>
+    <string name="edit_note">Edit note</string>
+    <string name="note_hint">Write a note…</string>
+    <string name="note_tip">Tip: tap the microphone on the keyboard to dictate.</string>
+    <string name="has_note">Has a note</string>
+    <string name="trash">Trash</string>
+    <string name="trash_empty">The trash is empty</string>
+    <string name="trash_info">Items are permanently deleted after 30 days.</string>
+    <string name="restore">Restore</string>
+    <string name="delete_forever">Delete permanently</string>
+    <string name="empty_trash">Empty trash</string>
+    <string name="empty_trash_q">Empty the trash?</string>
+    <string name="cannot_undo">This can\'t be undone.</string>
+    <string name="from_location">From %1$s</string>
+    <string name="moved_to_trash">Moved to the trash</string>
+    <string name="section_stamp">Photo stamp</string>
+    <string name="stamp_enabled">Stamp photos</string>
+    <string name="stamp_desc">Date, time, location and project are written into the photo</string>
+    <string name="stamp_location">Include location</string>
+    <string name="stamp_location_desc">Address from GPS in the stamp, and GPS data in photo and video files</string>
+    <plurals name="delete_forever_q">
+        <item quantity="one">Permanently delete %d item?</item>
+        <item quantity="other">Permanently delete %d items?</item>
+    </plurals>
+    <plurals name="expires_in">
+        <item quantity="one">Deleted in %d day</item>
+        <item quantity="other">Deleted in %d days</item>
+    </plurals>
+    <plurals name="restored_n">
+        <item quantity="one">Restored %d item</item>
+        <item quantity="other">Restored %d items</item>
     </plurals>
 </resources>

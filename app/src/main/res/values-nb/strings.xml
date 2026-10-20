@@ -34,8 +34,8 @@
     <string name="empty_root">Ingen prosjekter ennå.\nTrykk på mappeknappen nede til høyre for å starte.\n\nFilene lagres i Pictures/Onsite.</string>
     <string name="empty_folder">Tom mappe.\nTa bilder, video eller lydopptak her, eller lag undermapper med mappe-ikonet øverst.</string>
     <string name="delete_folder_q">Slette «%1$s»?</string>
-    <string name="files_deleted_permanently">Filene slettes permanent.</string>
-    <string name="file_deleted_permanently">Filen slettes permanent.</string>
+    <string name="files_deleted_permanently">Flyttes til papirkurven og kan gjenopprettes i 30 dager.</string>
+    <string name="file_deleted_permanently">Flyttes til papirkurven og kan gjenopprettes i 30 dager.</string>
     <string name="delete_photo_q">Slette bildet?</string>
     <string name="delete_video_q">Slette videoen?</string>
     <string name="delete_audio_q">Slette lydopptaket?</string>
@@ -124,8 +124,8 @@
         <item quantity="other">Slette %d filer?</item>
     </plurals>
     <plurals name="delete_folder_body">
-        <item quantity="one">Mappen, alle undermapper og %d fil slettes permanent.</item>
-        <item quantity="other">Mappen, alle undermapper og %d filer slettes permanent.</item>
+        <item quantity="one">Mappen med alt innhold (%d fil) flyttes til papirkurven og kan gjenopprettes i 30 dager.</item>
+        <item quantity="other">Mappen med alt innhold (%d filer) flyttes til papirkurven og kan gjenopprettes i 30 dager.</item>
     </plurals>
     <plurals name="moved_n_files_to">
         <item quantity="one">Flyttet %1$d fil til %2$s</item>
@@ -139,7 +139,40 @@
     <string name="delete_selected_q">Slette valgte?</string>
     <string name="nothing_to_share">Ingen filer å dele</string>
     <plurals name="delete_selected_body">
-        <item quantity="one">Alt i de valgte mappene slettes også – %d fil totalt.</item>
-        <item quantity="other">Alt i de valgte mappene slettes også – %d filer totalt.</item>
+        <item quantity="one">Alt i de valgte mappene blir med – %d fil totalt. Kan gjenopprettes fra papirkurven i 30 dager.</item>
+        <item quantity="other">Alt i de valgte mappene blir med – %d filer totalt. Kan gjenopprettes fra papirkurven i 30 dager.</item>
+    </plurals>
+    <string name="note">Notat</string>
+    <string name="add_note">Legg til notat</string>
+    <string name="edit_note">Rediger notat</string>
+    <string name="note_hint">Skriv et notat …</string>
+    <string name="note_tip">Tips: trykk på mikrofonen på tastaturet for å diktere.</string>
+    <string name="has_note">Har notat</string>
+    <string name="trash">Papirkurv</string>
+    <string name="trash_empty">Papirkurven er tom</string>
+    <string name="trash_info">Elementer slettes for godt etter 30 dager.</string>
+    <string name="restore">Gjenopprett</string>
+    <string name="delete_forever">Slett for godt</string>
+    <string name="empty_trash">Tøm papirkurven</string>
+    <string name="empty_trash_q">Tømme papirkurven?</string>
+    <string name="cannot_undo">Dette kan ikke angres.</string>
+    <string name="from_location">Fra %1$s</string>
+    <string name="moved_to_trash">Flyttet til papirkurven</string>
+    <string name="section_stamp">Stempel</string>
+    <string name="stamp_enabled">Stempel på bilder</string>
+    <string name="stamp_desc">Dato, klokkeslett, sted og prosjekt skrives inn i bildet</string>
+    <string name="stamp_location">Ta med posisjon</string>
+    <string name="stamp_location_desc">Adresse fra GPS i stempelet, og GPS-data i bilde- og videofiler</string>
+    <plurals name="delete_forever_q">
+        <item quantity="one">Slette %d element for godt?</item>
+        <item quantity="other">Slette %d elementer for godt?</item>
+    </plurals>
+    <plurals name="expires_in">
+        <item quantity="one">Slettes om %d dag</item>
+        <item quantity="other">Slettes om %d dager</item>
+    </plurals>
+    <plurals name="restored_n">
+        <item quantity="one">Gjenopprettet %d element</item>
+        <item quantity="other">Gjenopprettet %d elementer</item>
     </plurals>
 </resources>

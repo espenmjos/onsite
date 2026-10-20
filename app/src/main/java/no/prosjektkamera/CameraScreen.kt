@@ -98,7 +98,11 @@ import androidx.lifecycle.LifecycleOwner
 import androidx.lifecycle.LiveData
 import androidx.lifecycle.Observer
 import coil.compose.AsyncImage
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.withContext
 import kotlinx.coroutines.launch
 import java.io.File
 import java.util.Locale
@@ -197,30 +201,67 @@ private fun CameraContent(store: PhotoStore, folder: File, onClose: () -> Unit, 
     var recording by remember { mutableStateOf<Recording?>(null) }
     var recordNanos by remember { mutableLongStateOf(0L) }
 
-    val audioLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) {}
-    LaunchedEffect(mode) {
-        if (mode == Mode.VIDEO && !context.hasPermission(Manifest.permission.RECORD_AUDIO)) {
-            audioLauncher.launch(Manifest.permission.RECORD_AUDIO)
-        }
+    // Location for the stamp and for GPS tags in photo/video files.
+    val wantLocation = prefs.stampLocation
+    var locationGranted by remember { mutableStateOf(context.hasLocationPermission()) }
+    val tracker = remember { LocationTracker(context) }
+    val useLocation = wantLocation && locationGranted
+    DisposableEffect(useLocation) {
+        if (useLocation) tracker.start()
+        onDispose { if (useLocation) tracker.stop() }
     }
+    LaunchedEffect(useLocation) {
+        while (useLocation) { tracker.refreshAddress(); delay(5_000) }
+    }
+
+    // One combined request, so the microphone and location prompts don't collide.
+    val permissionLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) {
+        locationGranted = context.hasLocationPermission()
+    }
+    LaunchedEffect(mode, wantLocation) {
+        val missing = buildList {
+            if (mode == Mode.VIDEO && !context.hasPermission(Manifest.permission.RECORD_AUDIO)) {
+                add(Manifest.permission.RECORD_AUDIO)
+            }
+            if (wantLocation && !locationGranted) {
+                add(Manifest.permission.ACCESS_FINE_LOCATION); add(Manifest.permission.ACCESS_COARSE_LOCATION)
+            }
+        }
+        if (missing.isNotEmpty()) permissionLauncher.launch(missing.toTypedArray())
+    }
+
+    fun stampLines(): List<String> = if (!prefs.stampEnabled) emptyList() else listOfNotNull(
+        formatDateTime(context, System.currentTimeMillis()),
+        if (useLocation) tracker.describe() else null,
+        store.relativePath(folder).replace("/", " › "),
+    )
 
     fun takePhoto() {
         if (busy) return
         busy = true
         val file = store.newPhotoFile(folder)
+        val lines = stampLines()
+        val metadata = ImageCapture.Metadata().apply { if (useLocation) location = tracker.location }
         scope.launch {
             flashAlpha.snapTo(0.7f)
             flashAlpha.animateTo(0f, tween(250))
         }
         controller.takePicture(
-            ImageCapture.OutputFileOptions.Builder(file).build(),
+            ImageCapture.OutputFileOptions.Builder(file).setMetadata(metadata).build(),
             ContextCompat.getMainExecutor(context),
             object : ImageCapture.OnImageSavedCallback {
                 override fun onImageSaved(output: ImageCapture.OutputFileResults) {
                     busy = false
-                    last = file
-                    taken++
-                    store.mediaSaved(file)
+                    // Stamping takes ~1 s, so do it off the main thread in an app-wide scope
+                    // that survives leaving the camera; the shutter is free again right away.
+                    AppScope.launch {
+                        if (lines.isNotEmpty()) {
+                            withContext(Dispatchers.IO) { runCatching { Stamper.stamp(file, lines) } }
+                        }
+                        last = file
+                        taken++
+                        store.mediaSaved(file)
+                    }
                 }
 
                 override fun onError(e: ImageCaptureException) {
@@ -237,7 +278,7 @@ private fun CameraContent(store: PhotoStore, folder: File, onClose: () -> Unit, 
         val file = store.newVideoFile(folder)
         recordNanos = 0
         recording = controller.startRecording(
-            FileOutputOptions.Builder(file).build(),
+            FileOutputOptions.Builder(file).apply { if (useLocation) setLocation(tracker.location) }.build(),
             AudioConfig.create(context.hasPermission(Manifest.permission.RECORD_AUDIO)),
             ContextCompat.getMainExecutor(context),
         ) { event ->
@@ -632,6 +673,12 @@ private fun FocusRing(point: Offset?, state: Int?, onDone: () -> Unit) {
 
 private fun Context.hasPermission(p: String) =
     ContextCompat.checkSelfPermission(this, p) == PackageManager.PERMISSION_GRANTED
+
+private fun Context.hasLocationPermission() =
+    hasPermission(Manifest.permission.ACCESS_FINE_LOCATION) || hasPermission(Manifest.permission.ACCESS_COARSE_LOCATION)
+
+/** Outlives individual screens, for short jobs like stamping that must finish. */
+val AppScope = CoroutineScope(SupervisorJob() + Dispatchers.Main)
 
 @Composable
 private fun <T> LiveData<T>.observeAsState(owner: LifecycleOwner): State<T?> {

@@ -37,6 +37,7 @@ import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Share
 import androidx.compose.material.icons.filled.GraphicEq
+import androidx.compose.material.icons.filled.EditNote
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.Text
@@ -86,6 +87,8 @@ fun ViewerScreen(store: PhotoStore, folder: File, initial: File, onClose: () -> 
     val current = photos.getOrNull(pager.currentPage) ?: photos.last()
     var confirmDelete by remember { mutableStateOf(false) }
     var moving by remember { mutableStateOf(false) }
+    var editingNote by remember { mutableStateOf(false) }
+    val note = remember(current, version) { store.note(current) }
     // Tapping a photo hides/shows the bars, like the system gallery.
     var chrome by remember { mutableStateOf(true) }
 
@@ -101,6 +104,7 @@ fun ViewerScreen(store: PhotoStore, folder: File, initial: File, onClose: () -> 
 
         // ---- Top: back + date ----
         AnimatedVisibility(chrome || !current.isPhoto, enter = fadeIn(), exit = fadeOut()) {
+          Column {
             Box(
                 Modifier.fillMaxWidth().background(Color.Black.copy(alpha = 0.5f))
                     .windowInsetsPadding(WindowInsets.safeDrawing.only(WindowInsetsSides.Top + WindowInsetsSides.Horizontal))
@@ -122,6 +126,24 @@ fun ViewerScreen(store: PhotoStore, folder: File, initial: File, onClose: () -> 
                     )
                 }
             }
+            // The note sits under the top bar so it never covers the video/audio controls at the bottom.
+            note?.let {
+                Row(
+                    Modifier.fillMaxWidth().background(Color.Black.copy(alpha = 0.6f))
+                        .clickable { editingNote = true }
+                        .padding(horizontal = 16.dp, vertical = 10.dp),
+                ) {
+                    Icon(
+                        Icons.Default.EditNote, null, tint = SafetyYellow,
+                        modifier = Modifier.padding(end = 10.dp).size(20.dp),
+                    )
+                    Text(
+                        it, color = Color.White, style = MaterialTheme.typography.bodyMedium,
+                        maxLines = 5, overflow = TextOverflow.Ellipsis,
+                    )
+                }
+            }
+          }
         }
 
         // ---- Bottom: actions ----
@@ -136,11 +158,14 @@ fun ViewerScreen(store: PhotoStore, folder: File, initial: File, onClose: () -> 
                 horizontalArrangement = Arrangement.SpaceEvenly,
             ) {
                 BottomAction(Icons.Default.Share, stringResource(R.string.share)) { context.sharePhotos(listOf(current)) }
+                BottomAction(Icons.Default.EditNote, stringResource(R.string.note)) { editingNote = true }
                 BottomAction(Icons.AutoMirrored.Filled.DriveFileMove, stringResource(R.string.move_to)) { moving = true }
                 BottomAction(Icons.Default.Delete, stringResource(R.string.delete)) { confirmDelete = true }
             }
         }
     }
+
+    if (editingNote) NoteDialog(store, current) { editingNote = false }
 
     if (moving) {
         MoveDialog(
@@ -164,7 +189,11 @@ fun ViewerScreen(store: PhotoStore, folder: File, initial: File, onClose: () -> 
             },
             text = stringResource(R.string.file_deleted_permanently),
             onDismiss = { confirmDelete = false },
-            onConfirm = { confirmDelete = false; store.deleteItems(listOf(current)) },
+            onConfirm = {
+                confirmDelete = false
+                store.deleteItems(listOf(current))
+                Toast.makeText(context, R.string.moved_to_trash, Toast.LENGTH_SHORT).show()
+            },
         )
     }
 }

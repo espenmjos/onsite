@@ -93,6 +93,15 @@ fun SettingsScreen(store: PhotoStore, onClose: () -> Unit) {
                 s.volumeShutter,
             ) { s.volumeShutter = it }
 
+            Section(stringResource(R.string.section_stamp))
+            Toggle(stringResource(R.string.stamp_enabled), stringResource(R.string.stamp_desc), s.stampEnabled) {
+                s.stampEnabled = it
+            }
+            Toggle(
+                stringResource(R.string.stamp_location), stringResource(R.string.stamp_location_desc),
+                s.stampLocation,
+            ) { s.stampLocation = it }
+
             Section(stringResource(R.string.section_audio))
             Toggle(stringResource(R.string.high_audio), stringResource(R.string.high_audio_desc), s.highAudioQuality) {
                 s.highAudioQuality = it

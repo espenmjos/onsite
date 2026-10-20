@@ -83,10 +83,15 @@ class MainActivity : ComponentActivity() {
                 var camera by rememberSaveable { mutableStateOf(false) }
                 var viewerPhoto by rememberSaveable { mutableStateOf<String?>(null) }
                 var settings by rememberSaveable { mutableStateOf(false) }
+                var trash by rememberSaveable { mutableStateOf(false) }
 
                 val folder = File(store.root, folderPath).takeIf { it.isDirectory } ?: store.root
 
                 when {
+                    trash -> {
+                        BackHandler { trash = false }
+                        TrashScreen(store, onClose = { trash = false })
+                    }
                     settings -> {
                         BackHandler { settings = false }
                         SettingsScreen(store, onClose = { settings = false })
@@ -121,6 +126,7 @@ class MainActivity : ComponentActivity() {
                             onOpenCamera = { camera = true },
                             onOpenPhoto = { viewerPhoto = it.path },
                             onOpenSettings = { settings = true },
+                            onOpenTrash = { trash = true },
                         )
                     }
                 }

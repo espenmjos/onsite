@@ -9,6 +9,7 @@ import androidx.compose.foundation.combinedClickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxSize
@@ -34,6 +35,8 @@ import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.PhotoCamera
 import androidx.compose.material.icons.filled.PlayCircle
 import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.filled.EditNote
+import androidx.compose.material.icons.outlined.Delete
 import androidx.compose.material.icons.filled.SelectAll
 import androidx.compose.material.icons.filled.Mic
 import androidx.compose.material.icons.filled.GraphicEq
@@ -95,6 +98,7 @@ fun FolderScreen(
     onOpenCamera: () -> Unit,
     onOpenPhoto: (File) -> Unit,
     onOpenSettings: () -> Unit,
+    onOpenTrash: () -> Unit,
 ) {
     val context = LocalContext.current
     val isRoot = folder == store.root
@@ -108,6 +112,9 @@ fun FolderScreen(
     val photos = remember(folder, version) { store.media(folder) }
     val folderInfo = remember(folder, version) { if (isRoot) null else store.folderInfo(folder) }
     var recordingAudio by remember { mutableStateOf(false) }
+    var noteFor by remember { mutableStateOf<File?>(null) }
+    val noted = remember(folder, version) { store.notedFiles(folder) }
+    val folderNote = remember(folder, version) { if (isRoot) null else store.note(folder) }
 
     var selected by remember(folder) { mutableStateOf(setOf<File>()) }
     val selecting = selected.isNotEmpty()
@@ -179,6 +186,9 @@ fun FolderScreen(
                             }
                         }
                         if (isRoot) {
+                            IconButton(onClick = onOpenTrash) {
+                                Icon(Icons.Outlined.Delete, stringResource(R.string.trash))
+                            }
                             IconButton(onClick = onOpenSettings) {
                                 Icon(Icons.Default.Settings, stringResource(R.string.settings))
                             }
@@ -245,7 +255,9 @@ fun FolderScreen(
             verticalArrangement = Arrangement.spacedBy(4.dp),
         ) {
             folderInfo?.let { info ->
-                item(key = "header", span = { GridItemSpan(maxLineSpan) }) { FolderHeader(info) }
+                item(key = "header", span = { GridItemSpan(maxLineSpan) }) {
+                    FolderHeader(info, folderNote) { noteFor = folder }
+                }
             }
             items(subfolders, key = { "d:" + it.path }, span = { GridItemSpan(maxLineSpan) }) { dir ->
                 val isSel = dir in selected
@@ -327,6 +339,14 @@ fun FolderScreen(
                             )
                         }
                     }
+                    if (photo in noted) {
+                        Icon(
+                            Icons.Default.EditNote, stringResource(R.string.has_note),
+                            tint = Navy,
+                            modifier = Modifier.align(Alignment.TopStart).padding(5.dp).size(22.dp)
+                                .background(SafetyYellow, MaterialTheme.shapes.small).padding(2.dp),
+                        )
+                    }
                     if (isSel) {
                         Icon(
                             Icons.Default.CheckCircle, null,
@@ -341,6 +361,7 @@ fun FolderScreen(
     }
 
     if (recordingAudio) AudioRecordDialog(store, folder) { recordingAudio = false }
+    noteFor?.let { NoteDialog(store, it) { noteFor = null } }
 
     when (dialog) {
         FolderDialog.Create -> NameDialog(
@@ -369,7 +390,10 @@ fun FolderScreen(
                 title = stringResource(R.string.delete_folder_q, folder.name),
                 text = pluralStringResource(R.plurals.delete_folder_body, n, n),
                 onDismiss = { dialog = null },
-                onConfirm = { dialog = null; onUp(); store.deleteFolder(folder) },
+                onConfirm = {
+                    dialog = null; onUp(); store.deleteFolder(folder)
+                    toast(context.getString(R.string.moved_to_trash))
+                },
             )
         }
         FolderDialog.DeletePhotos -> {
@@ -381,7 +405,10 @@ fun FolderScreen(
                 text = if (hasFolders) pluralStringResource(R.plurals.delete_selected_body, n, n)
                 else stringResource(R.string.files_deleted_permanently),
                 onDismiss = { dialog = null },
-                onConfirm = { store.deleteItems(selected); selected = emptySet(); dialog = null },
+                onConfirm = {
+                    store.deleteItems(selected); selected = emptySet(); dialog = null
+                    toast(context.getString(R.string.moved_to_trash))
+                },
             )
         }
         FolderDialog.Move -> MoveDialog(
@@ -402,7 +429,7 @@ fun FolderScreen(
 }
 
 @Composable
-private fun FolderHeader(info: PhotoStore.FolderInfo) {
+private fun FolderHeader(info: PhotoStore.FolderInfo, note: String?, onEditNote: () -> Unit) {
     Column(
         Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 8.dp),
         verticalArrangement = Arrangement.spacedBy(2.dp),
@@ -415,6 +442,24 @@ private fun FolderHeader(info: PhotoStore.FolderInfo) {
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
+        if (note != null) {
+            Row(
+                Modifier.padding(top = 8.dp).fillMaxWidth().clip(MaterialTheme.shapes.medium)
+                    .background(MaterialTheme.colorScheme.secondaryContainer)
+                    .clickable(onClick = onEditNote).padding(12.dp),
+            ) {
+                Icon(
+                    Icons.Default.EditNote, null, tint = MaterialTheme.colorScheme.onSecondaryContainer,
+                    modifier = Modifier.padding(end = 10.dp).size(20.dp),
+                )
+                Text(note, color = MaterialTheme.colorScheme.onSecondaryContainer, style = MaterialTheme.typography.bodyMedium)
+            }
+        } else {
+            TextButton(onClick = onEditNote, contentPadding = PaddingValues(0.dp)) {
+                Icon(Icons.Default.EditNote, null, modifier = Modifier.size(18.dp))
+                Text("  " + stringResource(R.string.add_note))
+            }
+        }
     }
 }
 

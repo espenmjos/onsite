@@ -49,6 +49,7 @@ dependencies {
     implementation("androidx.media3:media3-ui:1.4.1")
     implementation("io.coil-kt:coil-compose:2.7.0")
     implementation("io.coil-kt:coil-video:2.7.0")
+    implementation("androidx.exifinterface:exifinterface:1.3.7")
     // 16 KB page-size aligned native lib (older version pulled in by Compose is not)
     implementation("androidx.graphics:graphics-path:1.0.1")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.8.1")

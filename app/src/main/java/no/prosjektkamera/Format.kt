@@ -44,6 +44,8 @@ fun formatWhen(context: Context, ms: Long): String {
 
 fun formatDate(context: Context, ms: Long): String = context.format("dMMMyyyy", ms)
 
+fun formatDateTime(context: Context, ms: Long): String = context.format("dMMMyyyyHm", ms)
+
 fun formatTime(context: Context, ms: Long): String = context.format("Hm", ms)
 
 fun formatDuration(ms: Long): String {

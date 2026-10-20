@@ -61,6 +61,7 @@ class PhotoStore(private val context: Context) {
             }
             legacy.delete()
         }
+        purgeExpiredTrash()
         changed()
     }
 
@@ -85,7 +86,92 @@ class PhotoStore(private val context: Context) {
         }
     }
 
-    private fun mediaUnder(dir: File) = dir.walkTopDown().filter { it.isMedia }.toList()
+    /** Media files below [dir], skipping hidden folders such as the trash. */
+    private fun mediaUnder(dir: File) =
+        dir.walkTopDown().onEnter { it == dir || !it.name.startsWith(".") }.filter { it.isMedia }.toList()
+
+    // ---------------------------------------------------------------- notes
+
+    /**
+     * Notes are plain-text sidecar files next to what they describe, hidden with a
+     * leading dot: ".IMG_x.jpg.notat.txt" for a file, ".notat.txt" inside a folder.
+     * Being ordinary files, they move with folders and will sync like everything else.
+     */
+    private fun noteFile(item: File) =
+        if (item.isDirectory) File(item, ".notat.txt") else File(item.parentFile, ".${item.name}.notat.txt")
+
+    fun note(item: File): String? =
+        noteFile(item).takeIf { it.exists() }?.readText()?.trim()?.takeIf { it.isNotEmpty() }
+
+    /** Files in [dir] that have a note, for badges in the grid. */
+    fun notedFiles(dir: File): Set<File> =
+        dir.list().orEmpty().filter { it.startsWith(".") && it.endsWith(".notat.txt") && it != ".notat.txt" }
+            .map { File(dir, it.removePrefix(".").removeSuffix(".notat.txt")) }.toSet()
+
+    fun setNote(item: File, text: String) {
+        val f = noteFile(item)
+        if (text.isBlank()) f.delete() else f.writeText(text.trim())
+        changed()
+    }
+
+    /** Moves [from]'s note (if any) along to [to]. */
+    private fun moveNote(from: File, to: File) {
+        if (from.isDirectory || to.isDirectory) return // folder notes live inside the folder
+        val src = noteFile(from)
+        if (src.exists()) {
+            val dst = noteFile(to)
+            if (!src.renameTo(dst)) { src.copyTo(dst, overwrite = true); src.delete() }
+        }
+    }
+
+    // ---------------------------------------------------------------- trash
+
+    /** Deleted items wait here for [TRASH_DAYS] days. Hidden, so it's skipped everywhere else. */
+    private val trashDir get() = File(root, ".papirkurv")
+
+    data class TrashEntry(val dir: File, val item: File, val originalPath: String, val deletedAt: Long) {
+        val expiresAt get() = deletedAt + TRASH_DAYS * 86_400_000L
+    }
+
+    fun trashEntries(): List<TrashEntry> =
+        trashDir.listFiles { f -> f.isDirectory }.orEmpty().mapNotNull { dir ->
+            val info = File(dir, ".info").takeIf { it.exists() }?.readLines() ?: return@mapNotNull null
+            val item = dir.listFiles { f -> !f.name.startsWith(".") }?.firstOrNull() ?: return@mapNotNull null
+            TrashEntry(dir, item, info.getOrElse(0) { "" }, info.getOrNull(1)?.toLongOrNull() ?: dir.lastModified())
+        }.sortedByDescending { it.deletedAt }
+
+    fun restore(entries: Collection<TrashEntry>) {
+        val restored = entries.map { e ->
+            val parent = File(root, e.originalPath).parentFile ?: root
+            parent.mkdirs()
+            val target = if (e.item.isDirectory) uniqueDir(parent, e.item.name)
+            else uniqueFile(parent, e.item.nameWithoutExtension, e.item.extension)
+            moveFile(e.item, target)
+            e.dir.deleteRecursively()
+            target
+        }
+        scan(mediaIn(restored))
+        changed()
+    }
+
+    fun deleteForever(entries: Collection<TrashEntry>) {
+        entries.forEach { it.dir.deleteRecursively() }
+        changed()
+    }
+
+    private fun purgeExpiredTrash() {
+        val now = System.currentTimeMillis()
+        trashEntries().filter { it.expiresAt < now }.forEach { it.dir.deleteRecursively() }
+    }
+
+    /** Renames, falling back to copy+delete; carries a file's note along. */
+    private fun moveFile(from: File, to: File) {
+        if (!from.renameTo(to)) {
+            from.copyRecursively(to)
+            from.deleteRecursively()
+        }
+        moveNote(from, to)
+    }
 
     fun relativePath(dir: File): String = dir.relativeTo(root).path
 
@@ -142,7 +228,7 @@ class PhotoStore(private val context: Context) {
         dir.listFiles { f -> f.isMedia }.orEmpty()
             .sortedByDescending { it.name.substringAfter('_') }
 
-    fun countMediaRecursive(dir: File): Int = dir.walkTopDown().count { it.isMedia }
+    fun countMediaRecursive(dir: File): Int = mediaUnder(dir).size
 
     /** Every folder below root, depth-first, for "move to" pickers. */
     fun allFolders(): List<File> =
@@ -169,21 +255,24 @@ class PhotoStore(private val context: Context) {
         target
     }
 
-    fun deleteFolder(dir: File) {
-        val before = mediaUnder(dir)
-        dir.deleteRecursively()
-        scan(before)
-        changed()
-    }
+    fun deleteFolder(dir: File) = deleteItems(listOf(dir))
 
     /** All media files in [items], expanding folders recursively. */
     fun mediaIn(items: Collection<File>): List<File> =
         items.flatMap { if (it.isDirectory) mediaUnder(it) else listOf(it) }
 
-    /** Deletes files and/or whole folders. */
+    /** Moves files and/or whole folders to the trash. */
     fun deleteItems(items: Collection<File>) {
         val gone = mediaIn(items)
-        items.forEach { if (it.isDirectory) it.deleteRecursively() else it.delete() }
+        trashDir.mkdirs()
+        File(trashDir, ".nomedia").createNewFile() // never show trash in the gallery
+        val now = System.currentTimeMillis()
+        items.forEachIndexed { i, item ->
+            val entry = File(trashDir, "${now}_$i")
+            entry.mkdirs()
+            File(entry, ".info").writeText("${relativePath(item)}\n$now\n")
+            moveFile(item, File(entry, item.name))
+        }
         scan(gone)
         changed()
     }
@@ -194,10 +283,7 @@ class PhotoStore(private val context: Context) {
         val targets = items.map { f ->
             val target = if (f.isDirectory) uniqueDir(dest, f.name)
             else uniqueFile(dest, f.nameWithoutExtension, f.extension)
-            if (!f.renameTo(target)) {
-                f.copyRecursively(target)
-                f.deleteRecursively()
-            }
+            moveFile(f, target)
             target
         }
         scan(before + mediaIn(targets))
@@ -234,6 +320,7 @@ class PhotoStore(private val context: Context) {
 
     companion object {
         private const val CREATED_FILE = ".opprettet"
+        const val TRASH_DAYS = 30
     }
 
     private fun sanitize(name: String): String {
