@@ -6,7 +6,7 @@ plugins {
 
 android {
     namespace = "no.prosjektkamera"
-    compileSdk = 34
+    compileSdk = 35
 
     defaultConfig {
         applicationId = "no.prosjektkamera"
@@ -34,7 +34,7 @@ android {
 }
 
 dependencies {
-    val camerax = "1.3.4"
+    val camerax = "1.4.2"
     implementation(platform("androidx.compose:compose-bom:2024.09.02"))
     implementation("androidx.compose.ui:ui")
     implementation("androidx.compose.material3:material3")
@@ -45,6 +45,8 @@ dependencies {
     implementation("androidx.camera:camera-lifecycle:$camerax")
     implementation("androidx.camera:camera-view:$camerax")
     implementation("io.coil-kt:coil-compose:2.7.0")
+    // 16 KB page-size aligned native lib (older version pulled in by Compose is not)
+    implementation("androidx.graphics:graphics-path:1.0.1")
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.8.1")
     debugImplementation("androidx.compose.ui:ui-tooling")
 }
