@@ -15,6 +15,7 @@
   <img alt="Jetpack Compose" src="https://img.shields.io/badge/Jetpack%20Compose-Material%203-4285F4?logo=jetpackcompose&logoColor=white">
   <img alt="CameraX" src="https://img.shields.io/badge/CameraX-1.4-FFC400">
   <img alt="Languages" src="https://img.shields.io/badge/i18n-English%20%7C%20Norsk-13293D">
+  <a href="LICENSE"><img alt="License: MIT" src="https://img.shields.io/badge/license-MIT-blue"></a>
 </p>
 
 ---
@@ -132,3 +133,8 @@ be signed with the same key.
 
 Kotlin · Jetpack Compose (Material 3) · CameraX 1.4 (photo + video) · Media3 ExoPlayer · Coil ·
 AndroidX ExifInterface · MediaRecorder · Android per-app locales · 16 KB page-size compatible
+
+## License
+
+[MIT](LICENSE) © 2026 Espen Mjøs. Demo photos in `docs/screenshots` are from Unsplash under the
+[Unsplash License](https://unsplash.com/license).
