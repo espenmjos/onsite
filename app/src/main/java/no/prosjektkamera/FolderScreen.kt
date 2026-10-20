@@ -15,6 +15,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.grid.GridCells
 import androidx.compose.foundation.lazy.grid.GridItemSpan
@@ -31,6 +32,7 @@ import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Folder
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.PhotoCamera
+import androidx.compose.material.icons.filled.PlayCircle
 import androidx.compose.material.icons.filled.Share
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Checkbox
@@ -57,6 +59,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
@@ -88,8 +91,8 @@ fun FolderScreen(
     val isRoot = folder == store.root
     val version = store.version.intValue
     val subfolders = remember(folder, version) { store.subfolders(folder) }
-    val photos = remember(folder, version) { store.photos(folder) }
-    val counts = remember(folder, version) { subfolders.associateWith { store.countPhotosRecursive(it) } }
+    val photos = remember(folder, version) { store.media(folder) }
+    val counts = remember(folder, version) { subfolders.associateWith { store.countMediaRecursive(it) } }
 
     var selected by remember(folder) { mutableStateOf(setOf<File>()) }
     val selecting = selected.isNotEmpty()
@@ -158,7 +161,7 @@ fun FolderScreen(
                                 DropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
                                     val visible = remember(version) { store.visibleInGallery }
                                     DropdownMenuItem(
-                                        text = { Text("Vis bildene i Galleri") },
+                                        text = { Text("Vis i Galleri") },
                                         trailingIcon = { Checkbox(checked = visible, onCheckedChange = null) },
                                         onClick = { menuOpen = false; store.visibleInGallery = !visible })
                                 }
@@ -170,7 +173,7 @@ fun FolderScreen(
                                 }
                                 DropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
                                     DropdownMenuItem(
-                                        text = { Text("Del alle bilder her") },
+                                        text = { Text("Del alt i denne mappen") },
                                         enabled = photos.isNotEmpty(),
                                         onClick = { menuOpen = false; context.sharePhotos(photos) })
                                     DropdownMenuItem(
@@ -197,7 +200,7 @@ fun FolderScreen(
                 ExtendedFloatingActionButton(
                     onClick = onOpenCamera,
                     icon = { Icon(Icons.Default.PhotoCamera, null) },
-                    text = { Text("Ta bilde") })
+                    text = { Text("Kamera") })
             }
         },
     ) { padding ->
@@ -205,7 +208,7 @@ fun FolderScreen(
             Box(Modifier.fillMaxSize().padding(padding).padding(32.dp), contentAlignment = Alignment.Center) {
                 Text(
                     if (isRoot) "Ingen prosjekter ennå.\nTrykk «Nytt prosjekt» for å starte.\n\nBildene lagres i Pictures/Prosjektkamera."
-                    else "Tom mappe.\nTa bilder her, eller lag undermapper med mappe-ikonet øverst.",
+                    else "Tom mappe.\nTa bilder og video her, eller lag undermapper med mappe-ikonet øverst.",
                     textAlign = TextAlign.Center,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
@@ -232,7 +235,7 @@ fun FolderScreen(
                     headlineContent = { Text(dir.name, maxLines = 1, overflow = TextOverflow.Ellipsis) },
                     supportingContent = {
                         val n = counts[dir] ?: 0
-                        Text(if (n == 1) "1 bilde" else "$n bilder")
+                        Text(if (n == 1) "1 fil" else "$n filer")
                     },
                 )
             }
@@ -257,6 +260,12 @@ fun FolderScreen(
                         contentScale = ContentScale.Crop,
                         modifier = Modifier.fillMaxSize().padding(if (isSel) 3.dp else 0.dp),
                     )
+                    if (photo.isVideo) {
+                        Icon(
+                            Icons.Default.PlayCircle, "Video", tint = Color.White,
+                            modifier = Modifier.align(Alignment.Center).size(36.dp)
+                        )
+                    }
                     if (isSel) {
                         Icon(
                             Icons.Default.CheckCircle, null,
@@ -292,17 +301,17 @@ fun FolderScreen(
             },
         )
         FolderDialog.DeleteFolder -> {
-            val n = store.countPhotosRecursive(folder)
+            val n = store.countMediaRecursive(folder)
             ConfirmDialog(
                 title = "Slette «${folder.name}»?",
-                text = "Mappen, alle undermapper og $n bilde(r) slettes permanent.",
+                text = "Mappen, alle undermapper og $n bilde(r)/video(er) slettes permanent.",
                 onDismiss = { dialog = null },
                 onConfirm = { dialog = null; onUp(); store.deleteFolder(folder) },
             )
         }
         FolderDialog.DeletePhotos -> ConfirmDialog(
-            title = "Slette ${selected.size} bilde(r)?",
-            text = "Bildene slettes permanent.",
+            title = "Slette ${selected.size} fil(er)?",
+            text = "Filene slettes permanent.",
             onDismiss = { dialog = null },
             onConfirm = { store.deletePhotos(selected); selected = emptySet(); dialog = null },
         )
@@ -314,7 +323,7 @@ fun FolderScreen(
                 val n = selected.size
                 store.movePhotos(selected, dest)
                 selected = emptySet(); dialog = null
-                toast("Flyttet $n bilde(r) til ${dest.name}")
+                toast("Flyttet $n fil(er) til ${dest.name}")
             },
         )
         null -> {}

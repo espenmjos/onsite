@@ -22,6 +22,7 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
@@ -39,6 +40,11 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.viewinterop.AndroidView
+import androidx.media3.common.MediaItem
+import androidx.media3.exoplayer.ExoPlayer
+import androidx.media3.ui.PlayerView
+import android.net.Uri
 import coil.compose.AsyncImage
 import java.io.File
 import java.text.SimpleDateFormat
@@ -49,7 +55,7 @@ import java.util.Locale
 fun ViewerScreen(store: PhotoStore, folder: File, initial: File, onClose: () -> Unit) {
     val context = LocalContext.current
     val version = store.version.intValue
-    val photos = remember(folder, version) { store.photos(folder) }
+    val photos = remember(folder, version) { store.media(folder) }
     if (photos.isEmpty()) {
         LaunchedEffect(Unit) { onClose() }
         return
@@ -60,7 +66,9 @@ fun ViewerScreen(store: PhotoStore, folder: File, initial: File, onClose: () -> 
 
     Box(Modifier.fillMaxSize().background(Color.Black)) {
         HorizontalPager(state = pager, modifier = Modifier.fillMaxSize(), key = { photos[it].path }) { page ->
-            ZoomableImage(photos[page])
+            val file = photos[page]
+            if (file.isVideo) VideoPage(file, isCurrent = page == pager.currentPage)
+            else ZoomableImage(file)
         }
         Row(
             Modifier.fillMaxWidth().background(Color.Black.copy(alpha = 0.4f)).safeDrawingPadding().padding(4.dp),
@@ -86,8 +94,8 @@ fun ViewerScreen(store: PhotoStore, folder: File, initial: File, onClose: () -> 
 
     if (confirmDelete) {
         ConfirmDialog(
-            title = "Slette bildet?",
-            text = "Bildet slettes permanent.",
+            title = if (current.isVideo) "Slette videoen?" else "Slette bildet?",
+            text = "Filen slettes permanent.",
             onDismiss = { confirmDelete = false },
             onConfirm = { confirmDelete = false; store.deletePhotos(listOf(current)) },
         )
@@ -131,4 +139,28 @@ private fun ZoomableImage(file: File) {
             },
         )
     }
+}
+
+@Composable
+private fun VideoPage(file: File, isCurrent: Boolean) {
+    val context = LocalContext.current
+    val player = remember(file) {
+        ExoPlayer.Builder(context).build().apply {
+            setMediaItem(MediaItem.fromUri(Uri.fromFile(file)))
+            prepare()
+        }
+    }
+    DisposableEffect(player) { onDispose { player.release() } }
+    // Pause when swiped away; start playing when this page becomes current.
+    LaunchedEffect(isCurrent) { player.playWhenReady = isCurrent }
+    AndroidView(
+        modifier = Modifier.fillMaxSize().padding(top = 56.dp),
+        factory = { ctx ->
+            PlayerView(ctx).apply {
+                this.player = player
+                setShowNextButton(false)
+                setShowPreviousButton(false)
+            }
+        },
+    )
 }

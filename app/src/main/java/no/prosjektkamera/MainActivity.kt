@@ -6,6 +6,7 @@ import android.content.Intent
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
+import android.view.KeyEvent
 import android.provider.Settings
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.BackHandler
@@ -42,13 +43,28 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.graphics.Color
 import androidx.core.content.FileProvider
+import coil.Coil
+import coil.ImageLoader
+import coil.decode.VideoFrameDecoder
 import java.io.File
 
 class MainActivity : ComponentActivity() {
+    override fun onKeyDown(keyCode: Int, event: KeyEvent): Boolean {
+        val shutter = HardwareShutter.listener
+        if (shutter != null && (keyCode == KeyEvent.KEYCODE_VOLUME_UP || keyCode == KeyEvent.KEYCODE_VOLUME_DOWN)) {
+            if (event.repeatCount == 0) shutter()
+            return true
+        }
+        return super.onKeyDown(keyCode, event)
+    }
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
         val store = PhotoStore(applicationContext)
+        Coil.setImageLoader(
+            ImageLoader.Builder(this).components { add(VideoFrameDecoder.Factory()) }.build()
+        )
 
         setContent {
             val scheme = if (isSystemInDarkTheme())
@@ -154,6 +170,12 @@ fun Context.sharePhotos(files: List<File>) {
         Intent(Intent.ACTION_SEND).putExtra(Intent.EXTRA_STREAM, uris[0])
     } else {
         Intent(Intent.ACTION_SEND_MULTIPLE).putParcelableArrayListExtra(Intent.EXTRA_STREAM, ArrayList(uris))
-    }.setType("image/jpeg").addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
-    startActivity(Intent.createChooser(intent, "Del bilder"))
+    }.setType(
+        when {
+            files.all { it.isVideo } -> "video/mp4"
+            files.none { it.isVideo } -> "image/jpeg"
+            else -> "*/*"
+        }
+    ).addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+    startActivity(Intent.createChooser(intent, "Del"))
 }

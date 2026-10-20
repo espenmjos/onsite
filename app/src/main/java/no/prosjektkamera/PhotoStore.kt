@@ -58,7 +58,7 @@ class PhotoStore(private val context: Context) {
         set(visible) {
             if (visible) noMedia.delete() else noMedia.createNewFile()
             // Ask the media scanner to (de)index everything under root.
-            scan(jpegsUnder(root), force = true)
+            scan(mediaUnder(root), force = true)
             changed()
         }
 
@@ -69,20 +69,19 @@ class PhotoStore(private val context: Context) {
         }
     }
 
-    private fun jpegsUnder(dir: File) =
-        dir.walkTopDown().filter { it.isFile && it.extension.equals("jpg", true) }.toList()
+    private fun mediaUnder(dir: File) = dir.walkTopDown().filter { it.isMedia }.toList()
 
     fun relativePath(dir: File): String = dir.relativeTo(root).path
 
     fun subfolders(dir: File): List<File> =
         dir.listFiles { f -> f.isDirectory && !f.name.startsWith(".") }.orEmpty().sortedBy { it.name.lowercase() }
 
-    fun photos(dir: File): List<File> =
-        dir.listFiles { f -> f.isFile && f.extension.equals("jpg", true) }.orEmpty()
-            .sortedByDescending { it.name }
+    /** Photos and videos in [dir], newest first. */
+    fun media(dir: File): List<File> =
+        dir.listFiles { f -> f.isMedia }.orEmpty()
+            .sortedByDescending { it.name.substringAfter('_') }
 
-    fun countPhotosRecursive(dir: File): Int =
-        dir.walkTopDown().count { it.isFile && it.extension.equals("jpg", true) }
+    fun countMediaRecursive(dir: File): Int = dir.walkTopDown().count { it.isMedia }
 
     /** Every folder below root, depth-first, for "move to" pickers. */
     fun allFolders(): List<File> =
@@ -101,15 +100,15 @@ class PhotoStore(private val context: Context) {
     fun renameFolder(dir: File, newName: String): Result<File> = runCatching {
         val target = File(dir.parentFile, sanitize(newName))
         require(!target.exists()) { "\"${target.name}\" finnes allerede" }
-        val before = jpegsUnder(dir)
+        val before = mediaUnder(dir)
         check(dir.renameTo(target)) { "Kunne ikke gi nytt navn" }
-        scan(before + jpegsUnder(target))
+        scan(before + mediaUnder(target))
         changed()
         target
     }
 
     fun deleteFolder(dir: File) {
-        val before = jpegsUnder(dir)
+        val before = mediaUnder(dir)
         dir.deleteRecursively()
         scan(before)
         changed()
@@ -135,12 +134,13 @@ class PhotoStore(private val context: Context) {
     }
 
     /** A new, not-yet-existing file to capture into. */
-    fun newPhotoFile(dir: File): File {
-        val stamp = SimpleDateFormat("yyyyMMdd_HHmmss", Locale.ROOT).format(Date())
-        return uniqueFile(dir, "IMG_$stamp", "jpg")
-    }
+    fun newPhotoFile(dir: File): File = uniqueFile(dir, "IMG_${stamp()}", "jpg")
 
-    fun photoSaved(file: File) {
+    fun newVideoFile(dir: File): File = uniqueFile(dir, "VID_${stamp()}", "mp4")
+
+    private fun stamp() = SimpleDateFormat("yyyyMMdd_HHmmss", Locale.ROOT).format(Date())
+
+    fun mediaSaved(file: File) {
         scan(listOf(file))
         changed()
     }
@@ -163,3 +163,6 @@ fun hasStorageAccess(context: Context): Boolean =
     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) Environment.isExternalStorageManager()
     else ContextCompat.checkSelfPermission(context, Manifest.permission.WRITE_EXTERNAL_STORAGE) ==
         PackageManager.PERMISSION_GRANTED
+
+val File.isVideo: Boolean get() = extension.equals("mp4", true)
+val File.isMedia: Boolean get() = isFile && (extension.equals("jpg", true) || isVideo)
