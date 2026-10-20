@@ -204,4 +204,11 @@
     <string name="address_hint">Adresse</string>
     <string name="reset_to_gps">Bruk GPS-adresse</string>
     <string name="edited_manually">Endret manuelt</string>
+    <string name="remove_originals">Fjern fra kamerarullen</string>
+    <string name="remove_originals_desc">Flytt i stedet for å kopiere – originalene legges i telefonens papirkurv</string>
+    <string name="originals_kept">Lagret – originalene ligger fortsatt i kamerarullen</string>
+    <plurals name="moved_n_to">
+        <item quantity="one">Flyttet %1$d fil til %2$s</item>
+        <item quantity="other">Flyttet %1$d filer til %2$s</item>
+    </plurals>
 </resources>

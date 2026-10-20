@@ -61,6 +61,8 @@ fun MoveDialog(
     confirmLabel: String = stringResource(R.string.move_here),
     /** Where browsing starts; defaults to next to [exclude]. */
     start: File? = null,
+    /** Optional extra controls shown under the folder list (e.g. copy vs. move). */
+    extra: (@Composable () -> Unit)? = null,
     onPick: (File) -> Unit,
 ) {
     val context = LocalContext.current
@@ -137,6 +139,7 @@ fun MoveDialog(
                     Icon(Icons.Default.CreateNewFolder, null)
                     Text("  " + stringResource(R.string.new_folder_here))
                 }
+                extra?.invoke()
             }
         },
         confirmButton = {

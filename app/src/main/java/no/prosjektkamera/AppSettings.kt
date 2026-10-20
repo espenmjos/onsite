@@ -34,6 +34,8 @@ class AppSettings private constructor(context: Context) {
 
     // Share target: folder last saved into, relative to the storage root
     var lastImportFolder by pref("lastImportFolder", "")
+    // Share target: remove the originals from the camera roll after copying them in
+    var importMove by pref("importMove", true)
 
     @Suppress("UNCHECKED_CAST")
     private fun <T> pref(key: String, default: T) = object : ReadWriteProperty<Any?, T> {

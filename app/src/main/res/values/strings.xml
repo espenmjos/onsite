@@ -205,4 +205,11 @@
     <string name="address_hint">Address</string>
     <string name="reset_to_gps">Use GPS address</string>
     <string name="edited_manually">Edited manually</string>
+    <string name="remove_originals">Remove from camera roll</string>
+    <string name="remove_originals_desc">Move instead of copy – the originals go to the phone\'s trash</string>
+    <string name="originals_kept">Saved – the originals were kept in the camera roll</string>
+    <plurals name="moved_n_to">
+        <item quantity="one">Moved %1$d file to %2$s</item>
+        <item quantity="other">Moved %1$d files to %2$s</item>
+    </plurals>
 </resources>
