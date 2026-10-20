@@ -38,7 +38,7 @@
 
 <sub>Demo photos from <a href="https://unsplash.com">Unsplash</a> (via Lorem Picsum) by Paul Evans, Dietmar Becker,
 Florian Klauer, Alexander Shustov, Steve Richey, Rodrigo Melo, Thanun Buranapong, Johnny Lam, Vadim Sherbakov,
-Aleks Dorohovich, Adam Przewoski and Charlie Foster.</sub>
+Aleks Dorohovich, Adam Przewoski, Luke Chesser, Art Wave, Christian Bardenhorst and Charlie Foster.</sub>
 
 ## Why Onsite?
 
