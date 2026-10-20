@@ -46,6 +46,7 @@ import androidx.compose.material3.ExtendedFloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.ListItem
+import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.SmallFloatingActionButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
@@ -162,8 +163,11 @@ fun FolderScreen(
                             Icon(Icons.Default.Delete, "Slett")
                         }
                     } else {
-                        IconButton(onClick = { dialog = FolderDialog.Create }) {
-                            Icon(Icons.Default.CreateNewFolder, "Ny mappe")
+                        // At the root, new projects are created with the floating button instead.
+                        if (!isRoot) {
+                            IconButton(onClick = { dialog = FolderDialog.Create }) {
+                                Icon(Icons.Default.CreateNewFolder, "Ny mappe")
+                            }
                         }
                         if (isRoot) {
                             IconButton(onClick = onOpenSettings) {
@@ -195,10 +199,9 @@ fun FolderScreen(
         floatingActionButton = {
             if (selecting) return@Scaffold
             if (isRoot) {
-                ExtendedFloatingActionButton(
-                    onClick = { dialog = FolderDialog.Create },
-                    icon = { Icon(Icons.Default.CreateNewFolder, null) },
-                    text = { Text("Nytt prosjekt") })
+                FloatingActionButton(onClick = { dialog = FolderDialog.Create }) {
+                    Icon(Icons.Default.CreateNewFolder, "Nytt prosjekt")
+                }
             } else {
                 Column(horizontalAlignment = Alignment.End, verticalArrangement = Arrangement.spacedBy(12.dp)) {
                     SmallFloatingActionButton(onClick = { recordingAudio = true }) {
@@ -215,7 +218,7 @@ fun FolderScreen(
         if (isRoot && subfolders.isEmpty()) {
             Box(Modifier.fillMaxSize().padding(padding).padding(32.dp), contentAlignment = Alignment.Center) {
                 Text(
-                    "Ingen prosjekter ennå.\nTrykk «Nytt prosjekt» for å starte.\n\nFilene lagres i Pictures/Prosjektkamera.",
+                    "Ingen prosjekter ennå.\nTrykk på mappeknappen nede til høyre for å starte.\n\nFilene lagres i Pictures/Prosjektkamera.",
                     textAlign = TextAlign.Center,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
