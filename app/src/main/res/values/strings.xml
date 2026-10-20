@@ -176,4 +176,18 @@
         <item quantity="one">Restored %d item</item>
         <item quantity="other">Restored %d items</item>
     </plurals>
+    <string name="save_here">Save here</string>
+    <string name="saved_some">Saved %1$d of %2$d files</string>
+    <plurals name="saving_n">
+        <item quantity="one">Saving %d file…</item>
+        <item quantity="other">Saving %d files…</item>
+    </plurals>
+    <plurals name="save_n_to_onsite">
+        <item quantity="one">Save %d file to Onsite</item>
+        <item quantity="other">Save %d files to Onsite</item>
+    </plurals>
+    <plurals name="saved_n_to">
+        <item quantity="one">Saved %1$d file to %2$s</item>
+        <item quantity="other">Saved %1$d files to %2$s</item>
+    </plurals>
 </resources>

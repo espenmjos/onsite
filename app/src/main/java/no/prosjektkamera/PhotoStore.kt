@@ -6,6 +6,7 @@ import android.content.pm.PackageManager
 import android.media.MediaScannerConnection
 import android.os.Build
 import android.os.Environment
+import android.webkit.MimeTypeMap
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.core.content.ContextCompat
 import java.io.File
@@ -226,7 +227,7 @@ class PhotoStore(private val context: Context) {
     /** Photos, videos and audio recordings in [dir], newest first. */
     fun media(dir: File): List<File> =
         dir.listFiles { f -> f.isMedia }.orEmpty()
-            .sortedByDescending { it.name.substringAfter('_') }
+            .sortedByDescending { it.lastModified() }
 
     fun countMediaRecursive(dir: File): Int = mediaUnder(dir).size
 
@@ -297,7 +298,20 @@ class PhotoStore(private val context: Context) {
 
     fun newAudioFile(dir: File): File = uniqueFile(dir, "LYD_${stamp()}", "m4a")
 
+    /** A free file name in [dir] based on [name] (as given by the sharing app). */
+    fun newImportFile(dir: File, name: String, fallbackExt: String): File {
+        val clean = name.replace(Regex("""[\\/:*?"<>|]"""), "-").trim().trimStart('.')
+        val base = clean.substringBeforeLast('.', clean).ifBlank { "IMPORT_${stamp()}" }
+        val ext = clean.substringAfterLast('.', "").ifBlank { fallbackExt }
+        return uniqueFile(dir, base, ext)
+    }
+
     private fun stamp() = SimpleDateFormat("yyyyMMdd_HHmmss", Locale.ROOT).format(Date())
+
+    fun imported(files: List<File>) {
+        scan(files)
+        changed()
+    }
 
     fun mediaSaved(file: File) {
         scan(listOf(file))
@@ -335,14 +349,19 @@ fun hasStorageAccess(context: Context): Boolean =
     else ContextCompat.checkSelfPermission(context, Manifest.permission.WRITE_EXTERNAL_STORAGE) ==
         PackageManager.PERMISSION_GRANTED
 
-val File.isPhoto: Boolean get() = extension.equals("jpg", true)
-val File.isVideo: Boolean get() = extension.equals("mp4", true)
-val File.isAudio: Boolean get() = extension.equals("m4a", true)
-val File.isMedia: Boolean get() = isFile && (isPhoto || isVideo || isAudio)
+private val photoExt = setOf("jpg", "jpeg", "png", "heic", "heif", "webp")
+private val videoExt = setOf("mp4", "mov", "3gp", "mkv", "webm")
+private val audioExt = setOf("m4a", "mp3", "aac", "wav", "ogg", "opus", "amr", "3ga")
+
+val File.isPhoto: Boolean get() = extension.lowercase() in photoExt
+val File.isVideo: Boolean get() = extension.lowercase() in videoExt
+val File.isAudio: Boolean get() = extension.lowercase() in audioExt
+val File.isMedia: Boolean get() = isFile && !name.startsWith(".") && (isPhoto || isVideo || isAudio)
 
 val File.mimeType: String
-    get() = when {
-        isVideo -> "video/mp4"
-        isAudio -> "audio/mp4"
-        else -> "image/jpeg"
-    }
+    get() = MimeTypeMap.getSingleton().getMimeTypeFromExtension(extension.lowercase())
+        ?: when {
+            isVideo -> "video/*"
+            isAudio -> "audio/*"
+            else -> "image/*"
+        }

@@ -57,10 +57,19 @@ fun MoveDialog(
     blocked: Set<File> = emptySet(),
     /** Folders may be moved to the top level (becoming projects); files may not. */
     allowRoot: Boolean = false,
+    title: String = stringResource(R.string.move_to),
+    confirmLabel: String = stringResource(R.string.move_here),
+    /** Where browsing starts; defaults to next to [exclude]. */
+    start: File? = null,
     onPick: (File) -> Unit,
 ) {
     val context = LocalContext.current
-    var current by remember { mutableStateOf(exclude.parentFile?.takeIf { it.startsWith(store.root) } ?: store.root) }
+    var current by remember {
+        mutableStateOf(
+            start?.takeIf { it.isDirectory && it.startsWith(store.root) }
+                ?: exclude.parentFile?.takeIf { it.startsWith(store.root) } ?: store.root
+        )
+    }
     var creating by remember { mutableStateOf(false) }
     val version = store.version.intValue
     val children = remember(current, version) { store.subfolders(current) }
@@ -69,7 +78,7 @@ fun MoveDialog(
 
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text(stringResource(R.string.move_to)) },
+        title = { Text(title) },
         text = {
             Column {
                 // Location bar: up arrow + breadcrumb
@@ -131,7 +140,7 @@ fun MoveDialog(
             }
         },
         confirmButton = {
-            Button(enabled = (!isRoot || allowRoot) && !isSource, onClick = { onPick(current) }) { Text(stringResource(R.string.move_here)) }
+            Button(enabled = (!isRoot || allowRoot) && !isSource, onClick = { onPick(current) }) { Text(confirmLabel) }
         },
         dismissButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.cancel)) } },
     )

@@ -32,6 +32,9 @@ class AppSettings private constructor(context: Context) {
     // Audio
     var highAudioQuality by pref("highAudioQuality", false)
 
+    // Share target: folder last saved into, relative to the storage root
+    var lastImportFolder by pref("lastImportFolder", "")
+
     @Suppress("UNCHECKED_CAST")
     private fun <T> pref(key: String, default: T) = object : ReadWriteProperty<Any?, T> {
         val state = mutableStateOf(

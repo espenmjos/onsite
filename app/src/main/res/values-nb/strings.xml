@@ -175,4 +175,18 @@
         <item quantity="one">Gjenopprettet %d element</item>
         <item quantity="other">Gjenopprettet %d elementer</item>
     </plurals>
+    <string name="save_here">Lagre her</string>
+    <string name="saved_some">Lagret %1$d av %2$d filer</string>
+    <plurals name="saving_n">
+        <item quantity="one">Lagrer %d fil …</item>
+        <item quantity="other">Lagrer %d filer …</item>
+    </plurals>
+    <plurals name="save_n_to_onsite">
+        <item quantity="one">Lagre %d fil i Onsite</item>
+        <item quantity="other">Lagre %d filer i Onsite</item>
+    </plurals>
+    <plurals name="saved_n_to">
+        <item quantity="one">Lagret %1$d fil i %2$s</item>
+        <item quantity="other">Lagret %1$d filer i %2$s</item>
+    </plurals>
 </resources>

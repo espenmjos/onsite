@@ -136,7 +136,7 @@ class MainActivity : ComponentActivity() {
 }
 
 @Composable
-private fun StorageAccessScreen() {
+fun StorageAccessScreen() {
     val context = LocalContext.current
     val legacyLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) {}
     Surface(Modifier.fillMaxSize()) {
