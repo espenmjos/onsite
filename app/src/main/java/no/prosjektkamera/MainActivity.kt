@@ -88,10 +88,15 @@ class MainActivity : ComponentActivity() {
                 var folderPath by rememberSaveable { mutableStateOf("") }
                 var camera by rememberSaveable { mutableStateOf(false) }
                 var viewerPhoto by rememberSaveable { mutableStateOf<String?>(null) }
+                var settings by rememberSaveable { mutableStateOf(false) }
 
                 val folder = File(store.root, folderPath).takeIf { it.isDirectory } ?: store.root
 
                 when {
+                    settings -> {
+                        BackHandler { settings = false }
+                        SettingsScreen(store, onClose = { settings = false })
+                    }
                     camera -> {
                         BackHandler { camera = false }
                         CameraScreen(
@@ -121,6 +126,7 @@ class MainActivity : ComponentActivity() {
                             onUp = { folderPath = store.relativePath(folder.parentFile!!) },
                             onOpenCamera = { camera = true },
                             onOpenPhoto = { viewerPhoto = it.path },
+                            onOpenSettings = { settings = true },
                         )
                     }
                 }
@@ -170,12 +176,6 @@ fun Context.sharePhotos(files: List<File>) {
         Intent(Intent.ACTION_SEND).putExtra(Intent.EXTRA_STREAM, uris[0])
     } else {
         Intent(Intent.ACTION_SEND_MULTIPLE).putParcelableArrayListExtra(Intent.EXTRA_STREAM, ArrayList(uris))
-    }.setType(
-        when {
-            files.all { it.isVideo } -> "video/mp4"
-            files.none { it.isVideo } -> "image/jpeg"
-            else -> "*/*"
-        }
-    ).addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+    }.setType(files.map { it.mimeType }.distinct().singleOrNull() ?: "*/*").addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
     startActivity(Intent.createChooser(intent, "Del"))
 }

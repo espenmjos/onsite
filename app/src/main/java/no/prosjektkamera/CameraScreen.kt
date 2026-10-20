@@ -15,7 +15,6 @@ import androidx.camera.core.resolutionselector.AspectRatioStrategy
 import androidx.camera.core.resolutionselector.ResolutionSelector
 import androidx.camera.video.FallbackStrategy
 import androidx.camera.video.FileOutputOptions
-import androidx.camera.video.Quality
 import androidx.camera.video.QualitySelector
 import androidx.camera.video.Recording
 import androidx.camera.video.VideoRecordEvent
@@ -104,8 +103,6 @@ import java.io.File
 import java.util.Locale
 import kotlin.math.abs
 import kotlin.math.roundToInt
-import kotlin.properties.ReadWriteProperty
-import kotlin.reflect.KProperty
 
 /** Lets the activity route hardware volume keys to the shutter while the camera is open. */
 object HardwareShutter {
@@ -116,41 +113,6 @@ private enum class Mode { PHOTO, VIDEO }
 
 private val Accent = Color(0xFFFFC94D)
 private val RecordRed = Color(0xFFE53935)
-
-/** Camera settings that survive between sessions, backed by Compose state so the UI reacts. */
-private class CameraPrefs(context: Context) {
-    private val p = context.getSharedPreferences("camera", Context.MODE_PRIVATE)
-    var mode by pref("mode", Mode.PHOTO.name)
-    var flash by pref("flash", ImageCapture.FLASH_MODE_AUTO)
-    var wide by pref("wide", false) // 16:9 instead of 4:3
-    var grid by pref("grid", true)
-    var videoQuality by pref("videoQuality", "FHD")
-
-    @Suppress("UNCHECKED_CAST")
-    private fun <T> pref(key: String, default: T) = object : ReadWriteProperty<Any?, T> {
-        val state = mutableStateOf(
-            when (default) {
-                is Boolean -> p.getBoolean(key, default)
-                is Int -> p.getInt(key, default)
-                else -> p.getString(key, default as String)
-            } as T
-        )
-
-        override fun getValue(thisRef: Any?, property: KProperty<*>) = state.value
-        override fun setValue(thisRef: Any?, property: KProperty<*>, value: T) {
-            state.value = value
-            p.edit().apply {
-                when (value) {
-                    is Boolean -> putBoolean(key, value)
-                    is Int -> putInt(key, value)
-                    else -> putString(key, value as String)
-                }
-            }.apply()
-        }
-    }
-}
-
-private val videoQualities = listOf("HD" to Quality.HD, "FHD" to Quality.FHD, "4K" to Quality.UHD)
 
 @Composable
 fun CameraScreen(store: PhotoStore, folder: File, onClose: () -> Unit, onOpenPhoto: (File) -> Unit) {
@@ -183,8 +145,8 @@ private fun CameraContent(store: PhotoStore, folder: File, onClose: () -> Unit, 
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
     val scope = rememberCoroutineScope()
-    val prefs = remember { CameraPrefs(context) }
-    val mode = Mode.valueOf(prefs.mode)
+    val prefs = remember { AppSettings.get(context) }
+    val mode = Mode.valueOf(prefs.cameraMode)
 
     // CameraController gives us pinch-to-zoom, tap-to-focus and rotation handling for free.
     val controller = remember {
@@ -209,7 +171,7 @@ private fun CameraContent(store: PhotoStore, folder: File, onClose: () -> Unit, 
         controller.imageCaptureResolutionSelector = selector
     }
     LaunchedEffect(prefs.videoQuality) {
-        val q = videoQualities.first { it.first == prefs.videoQuality }.second
+        val q = AppSettings.videoQualities.first { it.first == prefs.videoQuality }.second
         controller.videoCaptureQualitySelector = QualitySelector.from(q, FallbackStrategy.lowerQualityOrHigherThan(q))
     }
     LaunchedEffect(prefs.flash) { controller.imageCaptureFlashMode = prefs.flash }
@@ -298,8 +260,8 @@ private fun CameraContent(store: PhotoStore, folder: File, onClose: () -> Unit, 
 
     fun shutter() = if (mode == Mode.PHOTO) takePhoto() else toggleRecording()
 
-    DisposableEffect(mode) {
-        HardwareShutter.listener = ::shutter
+    DisposableEffect(mode, prefs.volumeShutter) {
+        HardwareShutter.listener = if (prefs.volumeShutter) ::shutter else null
         onDispose { HardwareShutter.listener = null }
     }
     // Leaving the screen ends any recording so the file gets finalized.
@@ -384,9 +346,9 @@ private fun CameraContent(store: PhotoStore, folder: File, onClose: () -> Unit, 
                 Modifier.fillMaxWidth().padding(top = 12.dp).alpha(if (isRecording) 0f else 1f),
                 horizontalArrangement = Arrangement.Center,
             ) {
-                ModeLabel("FOTO", mode == Mode.PHOTO, enabled = !isRecording) { prefs.mode = Mode.PHOTO.name }
+                ModeLabel("FOTO", mode == Mode.PHOTO, enabled = !isRecording) { prefs.cameraMode = Mode.PHOTO.name }
                 Spacer(Modifier.width(24.dp))
-                ModeLabel("VIDEO", mode == Mode.VIDEO, enabled = !isRecording) { prefs.mode = Mode.VIDEO.name }
+                ModeLabel("VIDEO", mode == Mode.VIDEO, enabled = !isRecording) { prefs.cameraMode = Mode.VIDEO.name }
             }
 
             // ---- Bottom bar: last capture, shutter, camera switch ----
@@ -583,24 +545,23 @@ private fun ExposurePanel(controller: LifecycleCameraController, index: Int, onC
 }
 
 @Composable
-private fun SettingsPanel(prefs: CameraPrefs) {
+private fun SettingsPanel(prefs: AppSettings) {
     Panel {
         SettingRow("Bildeformat") {
             Choice("4:3", !prefs.wide) { prefs.wide = false }
             Choice("16:9", prefs.wide) { prefs.wide = true }
         }
         SettingRow("Videokvalitet") {
-            videoQualities.forEach { (name, _) ->
+            AppSettings.videoQualities.forEach { (name, _) ->
                 Choice(name, prefs.videoQuality == name) { prefs.videoQuality = name }
             }
         }
         SettingRow("Rutenett") {
             Switch(checked = prefs.grid, onCheckedChange = { prefs.grid = it })
         }
-        Text(
-            "Tips: volumknappene fungerer som utløser.",
-            color = Color.White.copy(alpha = 0.7f), fontSize = 12.sp, modifier = Modifier.padding(top = 4.dp),
-        )
+        SettingRow("Volumknapper som utløser") {
+            Switch(checked = prefs.volumeShutter, onCheckedChange = { prefs.volumeShutter = it })
+        }
     }
 }
 

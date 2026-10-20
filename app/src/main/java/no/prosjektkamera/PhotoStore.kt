@@ -76,7 +76,52 @@ class PhotoStore(private val context: Context) {
     fun subfolders(dir: File): List<File> =
         dir.listFiles { f -> f.isDirectory && !f.name.startsWith(".") }.orEmpty().sortedBy { it.name.lowercase() }
 
-    /** Photos and videos in [dir], newest first. */
+    /** Summary shown on folder rows and in the folder header. */
+    data class FolderInfo(
+        val created: Long,
+        val lastAdded: Long?,
+        val photos: Int,
+        val videos: Int,
+        val audio: Int,
+        /** Newest photo or video, for the folder thumbnail. */
+        val cover: File?,
+    ) {
+        val total get() = photos + videos + audio
+        val lastActivity get() = lastAdded ?: created
+    }
+
+    fun folderInfo(dir: File): FolderInfo {
+        val files = mediaUnder(dir)
+        val newest = files.maxByOrNull { it.lastModified() }
+        return FolderInfo(
+            created = createdAt(dir, files),
+            lastAdded = newest?.lastModified(),
+            photos = files.count { it.isPhoto },
+            videos = files.count { it.isVideo },
+            audio = files.count { it.isAudio },
+            cover = files.filter { !it.isAudio }.maxByOrNull { it.lastModified() },
+        )
+    }
+
+    /**
+     * Creation time is stored in a small hidden file, since the filesystem doesn't
+     * keep one reliably. Folders made before this existed get a best guess, which
+     * is then written down so it stays stable.
+     */
+    private fun createdAt(dir: File, files: List<File>): Long {
+        val marker = File(dir, CREATED_FILE)
+        marker.takeIf { it.exists() }?.readText()?.trim()?.toLongOrNull()?.let { return it }
+        val guess = (files.map { it.lastModified() } + dir.lastModified()).min()
+        runCatching { marker.writeText(guess.toString()) }
+        return guess
+    }
+
+    fun storageSummary(): Pair<Int, Long> {
+        val files = mediaUnder(root)
+        return files.size to files.sumOf { it.length() }
+    }
+
+    /** Photos, videos and audio recordings in [dir], newest first. */
     fun media(dir: File): List<File> =
         dir.listFiles { f -> f.isMedia }.orEmpty()
             .sortedByDescending { it.name.substringAfter('_') }
@@ -85,7 +130,7 @@ class PhotoStore(private val context: Context) {
 
     /** Every folder below root, depth-first, for "move to" pickers. */
     fun allFolders(): List<File> =
-        root.walkTopDown().filter { it.isDirectory && it != root }
+        root.walkTopDown().onEnter { !it.name.startsWith(".") }.filter { it.isDirectory && it != root }
             .sortedBy { relativePath(it).lowercase() }.toList()
 
     fun createFolder(parent: File, name: String): Result<File> = runCatching {
@@ -93,6 +138,7 @@ class PhotoStore(private val context: Context) {
         val dir = File(parent, clean)
         require(!dir.exists()) { "\"$clean\" finnes allerede" }
         check(dir.mkdirs()) { "Kunne ikke opprette mappe" }
+        File(dir, CREATED_FILE).writeText(System.currentTimeMillis().toString())
         changed()
         dir
     }
@@ -138,6 +184,8 @@ class PhotoStore(private val context: Context) {
 
     fun newVideoFile(dir: File): File = uniqueFile(dir, "VID_${stamp()}", "mp4")
 
+    fun newAudioFile(dir: File): File = uniqueFile(dir, "LYD_${stamp()}", "m4a")
+
     private fun stamp() = SimpleDateFormat("yyyyMMdd_HHmmss", Locale.ROOT).format(Date())
 
     fun mediaSaved(file: File) {
@@ -152,6 +200,10 @@ class PhotoStore(private val context: Context) {
         return f
     }
 
+    companion object {
+        private const val CREATED_FILE = ".opprettet"
+    }
+
     private fun sanitize(name: String): String {
         val s = name.trim().replace(Regex("""[\\/:*?"<>|]"""), "-").trim('.', ' ')
         require(s.isNotEmpty()) { "Ugyldig navn" }
@@ -164,5 +216,14 @@ fun hasStorageAccess(context: Context): Boolean =
     else ContextCompat.checkSelfPermission(context, Manifest.permission.WRITE_EXTERNAL_STORAGE) ==
         PackageManager.PERMISSION_GRANTED
 
+val File.isPhoto: Boolean get() = extension.equals("jpg", true)
 val File.isVideo: Boolean get() = extension.equals("mp4", true)
-val File.isMedia: Boolean get() = isFile && (extension.equals("jpg", true) || isVideo)
+val File.isAudio: Boolean get() = extension.equals("m4a", true)
+val File.isMedia: Boolean get() = isFile && (isPhoto || isVideo || isAudio)
+
+val File.mimeType: String
+    get() = when {
+        isVideo -> "video/mp4"
+        isAudio -> "audio/mp4"
+        else -> "image/jpeg"
+    }

@@ -33,9 +33,12 @@ import androidx.compose.material.icons.filled.Folder
 import androidx.compose.material.icons.filled.MoreVert
 import androidx.compose.material.icons.filled.PhotoCamera
 import androidx.compose.material.icons.filled.PlayCircle
+import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material.icons.filled.Mic
+import androidx.compose.material.icons.filled.GraphicEq
+import androidx.compose.material.icons.filled.ChevronRight
 import androidx.compose.material.icons.filled.Share
 import androidx.compose.material3.AlertDialog
-import androidx.compose.material3.Checkbox
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
@@ -43,6 +46,7 @@ import androidx.compose.material3.ExtendedFloatingActionButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.ListItem
+import androidx.compose.material3.SmallFloatingActionButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.Scaffold
@@ -58,6 +62,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.focus.focusRequester
@@ -86,13 +91,20 @@ fun FolderScreen(
     onUp: () -> Unit,
     onOpenCamera: () -> Unit,
     onOpenPhoto: (File) -> Unit,
+    onOpenSettings: () -> Unit,
 ) {
     val context = LocalContext.current
     val isRoot = folder == store.root
     val version = store.version.intValue
-    val subfolders = remember(folder, version) { store.subfolders(folder) }
+    val settings = remember { AppSettings.get(context) }
+    val infos = remember(folder, version) { store.subfolders(folder).associateWith { store.folderInfo(it) } }
+    val subfolders = remember(infos, settings.sortByRecent) {
+        if (settings.sortByRecent) infos.keys.sortedByDescending { infos.getValue(it).lastActivity }
+        else infos.keys.toList()
+    }
     val photos = remember(folder, version) { store.media(folder) }
-    val counts = remember(folder, version) { subfolders.associateWith { store.countMediaRecursive(it) } }
+    val folderInfo = remember(folder, version) { if (isRoot) null else store.folderInfo(folder) }
+    var recordingAudio by remember { mutableStateOf(false) }
 
     var selected by remember(folder) { mutableStateOf(setOf<File>()) }
     val selecting = selected.isNotEmpty()
@@ -154,17 +166,8 @@ fun FolderScreen(
                             Icon(Icons.Default.CreateNewFolder, "Ny mappe")
                         }
                         if (isRoot) {
-                            Box {
-                                IconButton(onClick = { menuOpen = true }) {
-                                    Icon(Icons.Default.MoreVert, "Mer")
-                                }
-                                DropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
-                                    val visible = remember(version) { store.visibleInGallery }
-                                    DropdownMenuItem(
-                                        text = { Text("Vis i Galleri") },
-                                        trailingIcon = { Checkbox(checked = visible, onCheckedChange = null) },
-                                        onClick = { menuOpen = false; store.visibleInGallery = !visible })
-                                }
+                            IconButton(onClick = onOpenSettings) {
+                                Icon(Icons.Default.Settings, "Innstillinger")
                             }
                         } else {
                             Box {
@@ -197,18 +200,22 @@ fun FolderScreen(
                     icon = { Icon(Icons.Default.CreateNewFolder, null) },
                     text = { Text("Nytt prosjekt") })
             } else {
-                ExtendedFloatingActionButton(
-                    onClick = onOpenCamera,
-                    icon = { Icon(Icons.Default.PhotoCamera, null) },
-                    text = { Text("Kamera") })
+                Column(horizontalAlignment = Alignment.End, verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                    SmallFloatingActionButton(onClick = { recordingAudio = true }) {
+                        Icon(Icons.Default.Mic, "Lydopptak")
+                    }
+                    ExtendedFloatingActionButton(
+                        onClick = onOpenCamera,
+                        icon = { Icon(Icons.Default.PhotoCamera, null) },
+                        text = { Text("Kamera") })
+                }
             }
         },
     ) { padding ->
-        if (subfolders.isEmpty() && photos.isEmpty()) {
+        if (isRoot && subfolders.isEmpty()) {
             Box(Modifier.fillMaxSize().padding(padding).padding(32.dp), contentAlignment = Alignment.Center) {
                 Text(
-                    if (isRoot) "Ingen prosjekter ennå.\nTrykk «Nytt prosjekt» for å starte.\n\nBildene lagres i Pictures/Prosjektkamera."
-                    else "Tom mappe.\nTa bilder og video her, eller lag undermapper med mappe-ikonet øverst.",
+                    "Ingen prosjekter ennå.\nTrykk «Nytt prosjekt» for å starte.\n\nFilene lagres i Pictures/Prosjektkamera.",
                     textAlign = TextAlign.Center,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
@@ -226,18 +233,21 @@ fun FolderScreen(
             horizontalArrangement = Arrangement.spacedBy(4.dp),
             verticalArrangement = Arrangement.spacedBy(4.dp),
         ) {
+            folderInfo?.let { info ->
+                item(key = "header", span = { GridItemSpan(maxLineSpan) }) { FolderHeader(info) }
+            }
             items(subfolders, key = { "d:" + it.path }, span = { GridItemSpan(maxLineSpan) }) { dir ->
-                ListItem(
-                    modifier = Modifier.clickable(enabled = !selecting) { onOpenFolder(dir) },
-                    leadingContent = {
-                        Icon(Icons.Default.Folder, null, tint = MaterialTheme.colorScheme.secondary)
-                    },
-                    headlineContent = { Text(dir.name, maxLines = 1, overflow = TextOverflow.Ellipsis) },
-                    supportingContent = {
-                        val n = counts[dir] ?: 0
-                        Text(if (n == 1) "1 fil" else "$n filer")
-                    },
-                )
+                FolderRow(dir, infos.getValue(dir), enabled = !selecting) { onOpenFolder(dir) }
+            }
+            if (!isRoot && subfolders.isEmpty() && photos.isEmpty()) {
+                item(key = "empty", span = { GridItemSpan(maxLineSpan) }) {
+                    Text(
+                        "Tom mappe.\nTa bilder, video eller lydopptak her, eller lag undermapper med mappe-ikonet øverst.",
+                        textAlign = TextAlign.Center,
+                        color = MaterialTheme.colorScheme.onSurfaceVariant,
+                        modifier = Modifier.padding(32.dp),
+                    )
+                }
             }
             items(photos, key = { "f:" + it.path }) { photo ->
                 val isSel = photo in selected
@@ -254,17 +264,49 @@ fun FolderScreen(
                             onLongClick = { selected = selected + photo },
                         )
                 ) {
-                    AsyncImage(
-                        model = photo,
-                        contentDescription = photo.name,
-                        contentScale = ContentScale.Crop,
-                        modifier = Modifier.fillMaxSize().padding(if (isSel) 3.dp else 0.dp),
-                    )
+                    if (photo.isAudio) {
+                        Column(
+                            Modifier.fillMaxSize().background(MaterialTheme.colorScheme.tertiaryContainer),
+                            verticalArrangement = Arrangement.Center,
+                            horizontalAlignment = Alignment.CenterHorizontally,
+                        ) {
+                            Icon(
+                                Icons.Default.GraphicEq, "Lydopptak",
+                                tint = MaterialTheme.colorScheme.onTertiaryContainer,
+                                modifier = Modifier.size(40.dp),
+                            )
+                            Text(
+                                formatWhen(photo.lastModified()),
+                                style = MaterialTheme.typography.labelSmall,
+                                color = MaterialTheme.colorScheme.onTertiaryContainer,
+                            )
+                        }
+                    } else {
+                        AsyncImage(
+                            model = photo,
+                            contentDescription = photo.name,
+                            contentScale = ContentScale.Crop,
+                            modifier = Modifier.fillMaxSize().padding(if (isSel) 3.dp else 0.dp),
+                        )
+                    }
                     if (photo.isVideo) {
                         Icon(
                             Icons.Default.PlayCircle, "Video", tint = Color.White,
                             modifier = Modifier.align(Alignment.Center).size(36.dp)
                         )
+                    }
+                    if (photo.isVideo || photo.isAudio) {
+                        val duration by rememberDuration(photo)
+                        duration?.let {
+                            Text(
+                                formatDuration(it),
+                                color = Color.White,
+                                style = MaterialTheme.typography.labelSmall,
+                                modifier = Modifier.align(Alignment.BottomEnd).padding(4.dp)
+                                    .background(Color.Black.copy(alpha = 0.6f), MaterialTheme.shapes.extraSmall)
+                                    .padding(horizontal = 4.dp, vertical = 1.dp),
+                            )
+                        }
                     }
                     if (isSel) {
                         Icon(
@@ -278,6 +320,8 @@ fun FolderScreen(
             }
         }
     }
+
+    if (recordingAudio) AudioRecordDialog(store, folder) { recordingAudio = false }
 
     when (dialog) {
         FolderDialog.Create -> NameDialog(
@@ -304,7 +348,7 @@ fun FolderScreen(
             val n = store.countMediaRecursive(folder)
             ConfirmDialog(
                 title = "Slette «${folder.name}»?",
-                text = "Mappen, alle undermapper og $n bilde(r)/video(er) slettes permanent.",
+                text = "Mappen, alle undermapper og $n fil(er) slettes permanent.",
                 onDismiss = { dialog = null },
                 onConfirm = { dialog = null; onUp(); store.deleteFolder(folder) },
             )
@@ -328,6 +372,60 @@ fun FolderScreen(
         )
         null -> {}
     }
+}
+
+@Composable
+private fun FolderHeader(info: PhotoStore.FolderInfo) {
+    Column(
+        Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 8.dp),
+        verticalArrangement = Arrangement.spacedBy(2.dp),
+    ) {
+        Text(formatCounts(info), style = MaterialTheme.typography.bodyMedium)
+        Text(
+            "Opprettet ${formatDate(info.created)}" +
+                (info.lastAdded?.let { " · Sist lagt til ${formatWhen(it)}" } ?: ""),
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant,
+        )
+    }
+}
+
+@Composable
+private fun FolderRow(dir: File, info: PhotoStore.FolderInfo, enabled: Boolean, onClick: () -> Unit) {
+    ListItem(
+        modifier = Modifier.clickable(enabled = enabled, onClick = onClick),
+        leadingContent = {
+            Box(
+                Modifier.size(56.dp).clip(MaterialTheme.shapes.medium)
+                    .background(MaterialTheme.colorScheme.surfaceVariant),
+                contentAlignment = Alignment.Center,
+            ) {
+                if (info.cover != null) {
+                    AsyncImage(
+                        model = info.cover, contentDescription = null,
+                        contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize(),
+                    )
+                } else {
+                    Icon(Icons.Default.Folder, null, tint = MaterialTheme.colorScheme.secondary)
+                }
+            }
+        },
+        headlineContent = { Text(dir.name, maxLines = 1, overflow = TextOverflow.Ellipsis) },
+        supportingContent = {
+            Column {
+                Text(formatCounts(info), maxLines = 1, overflow = TextOverflow.Ellipsis)
+                Text(
+                    info.lastAdded?.let { "Sist lagt til ${formatWhen(it)}" }
+                        ?: "Opprettet ${formatDate(info.created)}",
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                )
+            }
+        },
+        trailingContent = {
+            Icon(Icons.Default.ChevronRight, null, tint = MaterialTheme.colorScheme.onSurfaceVariant)
+        },
+    )
 }
 
 @Composable

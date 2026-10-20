@@ -8,6 +8,10 @@ import androidx.compose.foundation.gestures.calculateZoom
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
@@ -18,9 +22,11 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Share
+import androidx.compose.material.icons.filled.GraphicEq
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.Text
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
@@ -68,8 +74,11 @@ fun ViewerScreen(store: PhotoStore, folder: File, initial: File, onClose: () -> 
     Box(Modifier.fillMaxSize().background(Color.Black)) {
         HorizontalPager(state = pager, modifier = Modifier.fillMaxSize(), key = { photos[it].path }) { page ->
             val file = photos[page]
-            if (file.isVideo) VideoPage(file, isCurrent = page == pager.currentPage)
-            else ZoomableImage(file)
+            when {
+                file.isVideo -> VideoPage(file, isCurrent = page == pager.currentPage)
+                file.isAudio -> AudioPage(file, isCurrent = page == pager.currentPage)
+                else -> ZoomableImage(file)
+            }
         }
         Row(
             Modifier.fillMaxWidth().background(Color.Black.copy(alpha = 0.4f)).safeDrawingPadding().padding(4.dp),
@@ -95,7 +104,11 @@ fun ViewerScreen(store: PhotoStore, folder: File, initial: File, onClose: () -> 
 
     if (confirmDelete) {
         ConfirmDialog(
-            title = if (current.isVideo) "Slette videoen?" else "Slette bildet?",
+            title = when {
+                current.isVideo -> "Slette videoen?"
+                current.isAudio -> "Slette lydopptaket?"
+                else -> "Slette bildet?"
+            },
             text = "Filen slettes permanent.",
             onDismiss = { confirmDelete = false },
             onConfirm = { confirmDelete = false; store.deletePhotos(listOf(current)) },
@@ -143,7 +156,7 @@ private fun ZoomableImage(file: File) {
 }
 
 @Composable
-private fun VideoPage(file: File, isCurrent: Boolean) {
+private fun rememberPlayer(file: File, isCurrent: Boolean, autoPlay: Boolean): ExoPlayer {
     val context = LocalContext.current
     val player = remember(file) {
         ExoPlayer.Builder(context).build().apply {
@@ -152,8 +165,47 @@ private fun VideoPage(file: File, isCurrent: Boolean) {
         }
     }
     DisposableEffect(player) { onDispose { player.release() } }
-    // Pause when swiped away; start playing when this page becomes current.
-    LaunchedEffect(isCurrent) { player.playWhenReady = isCurrent }
+    // Pause when swiped away; optionally start playing when this page becomes current.
+    LaunchedEffect(isCurrent) { player.playWhenReady = isCurrent && autoPlay }
+    return player
+}
+
+@Composable
+private fun AudioPage(file: File, isCurrent: Boolean) {
+    val player = rememberPlayer(file, isCurrent, autoPlay = false)
+    Column(
+        Modifier.fillMaxSize().safeDrawingPadding().padding(top = 56.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+    ) {
+        Spacer(Modifier.weight(1f))
+        Icon(Icons.Default.GraphicEq, null, tint = Color.White, modifier = Modifier.size(120.dp))
+        Text("Lydopptak", color = Color.White, style = MaterialTheme.typography.titleLarge)
+        Text(
+            file.name, color = Color.White.copy(alpha = 0.6f),
+            style = MaterialTheme.typography.bodySmall,
+        )
+        Spacer(Modifier.weight(1f))
+        AndroidView(
+            modifier = Modifier.fillMaxWidth().height(160.dp),
+            factory = { ctx ->
+                PlayerView(ctx).apply {
+                    this.player = player
+                    // Audio has no picture, so keep the controls permanently visible.
+                    controllerShowTimeoutMs = 0
+                    controllerHideOnTouch = false
+                    setShowNextButton(false)
+                    setShowPreviousButton(false)
+                    findViewById<View>(androidx.media3.ui.R.id.exo_settings)?.visibility = View.GONE
+                    showController()
+                }
+            },
+        )
+    }
+}
+
+@Composable
+private fun VideoPage(file: File, isCurrent: Boolean) {
+    val player = rememberPlayer(file, isCurrent, autoPlay = true)
     AndroidView(
         // Keep the player's controls clear of the status bar/top bar and the system navigation bar.
         modifier = Modifier.fillMaxSize().safeDrawingPadding().padding(top = 56.dp),
