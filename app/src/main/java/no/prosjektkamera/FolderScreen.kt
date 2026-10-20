@@ -462,30 +462,3 @@ fun ConfirmDialog(title: String, text: String, onDismiss: () -> Unit, onConfirm:
         dismissButton = { TextButton(onClick = onDismiss) { Text("Avbryt") } },
     )
 }
-
-@Composable
-fun MoveDialog(store: PhotoStore, exclude: File, onDismiss: () -> Unit, onPick: (File) -> Unit) {
-    val folders = remember { store.allFolders().filter { it != exclude } }
-    AlertDialog(
-        onDismissRequest = onDismiss,
-        title = { Text("Flytt til mappe") },
-        text = {
-            if (folders.isEmpty()) {
-                Text("Ingen andre mapper å flytte til.")
-            } else {
-                LazyColumn(Modifier.heightIn(max = 400.dp)) {
-                    items(folders) { dir ->
-                        val depth = store.relativePath(dir).count { it == '/' }
-                        ListItem(
-                            modifier = Modifier.clickable { onPick(dir) }.padding(start = (depth * 16).dp),
-                            leadingContent = { Icon(Icons.Default.Folder, null) },
-                            headlineContent = { Text(dir.name) },
-                        )
-                    }
-                }
-            }
-        },
-        confirmButton = {},
-        dismissButton = { TextButton(onClick = onDismiss) { Text("Avbryt") } },
-    )
-}
