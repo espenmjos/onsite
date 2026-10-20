@@ -51,6 +51,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
@@ -106,17 +107,17 @@ fun ViewerScreen(store: PhotoStore, folder: File, initial: File, onClose: () -> 
                     .padding(4.dp),
             ) {
                 IconButton(onClick = onClose, modifier = Modifier.align(Alignment.CenterStart)) {
-                    Icon(Icons.AutoMirrored.Filled.ArrowBack, "Tilbake", tint = Color.White)
+                    Icon(Icons.AutoMirrored.Filled.ArrowBack, stringResource(R.string.back), tint = Color.White)
                 }
                 val date = Date(current.lastModified())
                 Column(Modifier.align(Alignment.Center), horizontalAlignment = Alignment.CenterHorizontally) {
                     Text(
-                        SimpleDateFormat("d. MMM yyyy", Locale("nb")).format(date),
+                        formatDate(context, current.lastModified()),
                         color = Color.White, style = MaterialTheme.typography.titleMedium,
                     )
                     Text(
-                        SimpleDateFormat("HH:mm", Locale("nb")).format(date) +
-                            "  ·  ${pager.currentPage + 1} av ${photos.size}",
+                        formatTime(context, current.lastModified()) + "  ·  " +
+                            stringResource(R.string.position, pager.currentPage + 1, photos.size),
                         color = Color.White.copy(alpha = 0.8f), style = MaterialTheme.typography.bodySmall,
                     )
                 }
@@ -134,9 +135,9 @@ fun ViewerScreen(store: PhotoStore, folder: File, initial: File, onClose: () -> 
                     .padding(vertical = 6.dp),
                 horizontalArrangement = Arrangement.SpaceEvenly,
             ) {
-                BottomAction(Icons.Default.Share, "Del") { context.sharePhotos(listOf(current)) }
-                BottomAction(Icons.AutoMirrored.Filled.DriveFileMove, "Flytt til") { moving = true }
-                BottomAction(Icons.Default.Delete, "Slett") { confirmDelete = true }
+                BottomAction(Icons.Default.Share, stringResource(R.string.share)) { context.sharePhotos(listOf(current)) }
+                BottomAction(Icons.AutoMirrored.Filled.DriveFileMove, stringResource(R.string.move_to)) { moving = true }
+                BottomAction(Icons.Default.Delete, stringResource(R.string.delete)) { confirmDelete = true }
             }
         }
     }
@@ -149,7 +150,7 @@ fun ViewerScreen(store: PhotoStore, folder: File, initial: File, onClose: () -> 
             onPick = { dest ->
                 moving = false
                 store.movePhotos(listOf(current), dest)
-                Toast.makeText(context, "Flyttet til ${dest.name}", Toast.LENGTH_SHORT).show()
+                Toast.makeText(context, context.getString(R.string.moved_to, dest.name), Toast.LENGTH_SHORT).show()
             },
         )
     }
@@ -157,11 +158,11 @@ fun ViewerScreen(store: PhotoStore, folder: File, initial: File, onClose: () -> 
     if (confirmDelete) {
         ConfirmDialog(
             title = when {
-                current.isVideo -> "Slette videoen?"
-                current.isAudio -> "Slette lydopptaket?"
-                else -> "Slette bildet?"
+                current.isVideo -> stringResource(R.string.delete_video_q)
+                current.isAudio -> stringResource(R.string.delete_audio_q)
+                else -> stringResource(R.string.delete_photo_q)
             },
-            text = "Filen slettes permanent.",
+            text = stringResource(R.string.file_deleted_permanently),
             onDismiss = { confirmDelete = false },
             onConfirm = { confirmDelete = false; store.deletePhotos(listOf(current)) },
         )
@@ -243,7 +244,7 @@ private fun AudioPage(file: File, isCurrent: Boolean) {
     ) {
         Spacer(Modifier.weight(1f))
         Icon(Icons.Default.GraphicEq, null, tint = Color.White, modifier = Modifier.size(120.dp))
-        Text("Lydopptak", color = Color.White, style = MaterialTheme.typography.titleLarge)
+        Text(stringResource(R.string.voice_note), color = Color.White, style = MaterialTheme.typography.titleLarge)
         Text(
             file.name, color = Color.White.copy(alpha = 0.6f),
             style = MaterialTheme.typography.bodySmall,

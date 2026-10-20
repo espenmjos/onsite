@@ -33,6 +33,8 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.pluralStringResource
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextAlign
@@ -57,7 +59,7 @@ fun MoveDialog(store: PhotoStore, exclude: File, onDismiss: () -> Unit, onPick: 
 
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text("Flytt til") },
+        title = { Text(stringResource(R.string.move_to)) },
         text = {
             Column {
                 // Location bar: up arrow + breadcrumb
@@ -65,12 +67,12 @@ fun MoveDialog(store: PhotoStore, exclude: File, onDismiss: () -> Unit, onPick: 
                     IconButton(enabled = !isRoot, onClick = { current = current.parentFile!! }) {
                         Icon(
                             if (isRoot) Icons.Default.Home else Icons.AutoMirrored.Filled.ArrowBack,
-                            "Opp",
+                            stringResource(R.string.up),
                         )
                     }
                     Text(
-                        if (isRoot) "Prosjekter"
-                        else "Prosjekter › " + store.relativePath(current).replace("/", " › "),
+                        if (isRoot) stringResource(R.string.projects)
+                        else stringResource(R.string.projects) + " › " + store.relativePath(current).replace("/", " › "),
                         style = MaterialTheme.typography.titleSmall,
                         maxLines = 2, overflow = TextOverflow.Ellipsis,
                     )
@@ -79,7 +81,7 @@ fun MoveDialog(store: PhotoStore, exclude: File, onDismiss: () -> Unit, onPick: 
                 Box(Modifier.height(320.dp)) {
                     if (children.isEmpty()) {
                         Text(
-                            "Ingen undermapper her",
+                            stringResource(R.string.no_subfolders),
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
                             textAlign = TextAlign.Center,
                             modifier = Modifier.fillMaxWidth().padding(top = 32.dp),
@@ -97,11 +99,11 @@ fun MoveDialog(store: PhotoStore, exclude: File, onDismiss: () -> Unit, onPick: 
                                 },
                                 headlineContent = {
                                     Text(
-                                        dir.name + if (dir == exclude) " (nåværende)" else "",
+                                        if (dir == exclude) stringResource(R.string.folder_current, dir.name) else dir.name,
                                         maxLines = 1, overflow = TextOverflow.Ellipsis,
                                     )
                                 },
-                                supportingContent = { Text(if (count == 1) "1 fil" else "$count filer") },
+                                supportingContent = { Text(pluralStringResource(R.plurals.n_files, count, count)) },
                                 trailingContent = if (hasChildren) {
                                     { Icon(Icons.Default.ChevronRight, null) }
                                 } else null,
@@ -112,25 +114,25 @@ fun MoveDialog(store: PhotoStore, exclude: File, onDismiss: () -> Unit, onPick: 
                 HorizontalDivider()
                 TextButton(onClick = { creating = true }) {
                     Icon(Icons.Default.CreateNewFolder, null)
-                    Text("  Ny mappe her")
+                    Text("  " + stringResource(R.string.new_folder_here))
                 }
             }
         },
         confirmButton = {
-            Button(enabled = !isRoot && !isSource, onClick = { onPick(current) }) { Text("Flytt hit") }
+            Button(enabled = !isRoot && !isSource, onClick = { onPick(current) }) { Text(stringResource(R.string.move_here)) }
         },
-        dismissButton = { TextButton(onClick = onDismiss) { Text("Avbryt") } },
+        dismissButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.cancel)) } },
     )
 
     if (creating) {
         NameDialog(
-            title = if (isRoot) "Nytt prosjekt" else "Ny mappe i «${current.name}»",
+            title = if (isRoot) stringResource(R.string.new_project) else stringResource(R.string.new_folder_in, current.name),
             initial = "",
             onDismiss = { creating = false },
             onConfirm = { name ->
                 store.createFolder(current, name)
                     .onSuccess { creating = false; current = it }
-                    .onFailure { Toast.makeText(context, it.message ?: "Feil", Toast.LENGTH_SHORT).show() }
+                    .onFailure { Toast.makeText(context, it.message ?: context.getString(R.string.error), Toast.LENGTH_SHORT).show() }
             },
         )
     }

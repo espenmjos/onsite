@@ -1,3 +1,139 @@
+<?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="app_name">Onsite</string>
+    <string name="app_name" translatable="false">Onsite</string>
+    <string name="cancel">Cancel</string>
+    <string name="ok">OK</string>
+    <string name="delete">Delete</string>
+    <string name="share">Share</string>
+    <string name="back">Back</string>
+    <string name="up">Up</string>
+    <string name="close">Close</string>
+    <string name="more">More</string>
+    <string name="error">Error</string>
+    <string name="grant_access">Grant access</string>
+    <string name="settings">Settings</string>
+    <string name="projects">Projects</string>
+    <string name="name">Name</string>
+    <string name="move">Move</string>
+    <string name="move_to">Move to</string>
+    <string name="move_here">Move here</string>
+    <string name="camera">Camera</string>
+    <string name="video">Video</string>
+    <string name="voice_note">Voice note</string>
+    <string name="new_folder">New folder</string>
+    <string name="new_folder_here">New folder here</string>
+    <string name="new_project">New project</string>
+    <string name="new_folder_in">New folder in “%1$s”</string>
+    <string name="new_subfolder_in">New subfolder in “%1$s”</string>
+    <string name="no_subfolders">No subfolders here</string>
+    <string name="folder_current">%1$s (current)</string>
+    <string name="rename">Rename</string>
+    <string name="delete_folder">Delete folder</string>
+    <string name="share_all_here">Share everything in this folder</string>
+    <string name="cancel_selection">Cancel selection</string>
+    <string name="empty">Empty</string>
+    <string name="empty_root">No projects yet.\nTap the folder button at the bottom right to get started.\n\nFiles are saved in Pictures/Onsite.</string>
+    <string name="empty_folder">Empty folder.\nTake photos, video or voice notes here, or create subfolders with the folder icon at the top.</string>
+    <string name="delete_folder_q">Delete “%1$s”?</string>
+    <string name="files_deleted_permanently">The files will be permanently deleted.</string>
+    <string name="file_deleted_permanently">The file will be permanently deleted.</string>
+    <string name="delete_photo_q">Delete this photo?</string>
+    <string name="delete_video_q">Delete this video?</string>
+    <string name="delete_audio_q">Delete this voice note?</string>
+    <string name="moved_to">Moved to %1$s</string>
+    <string name="created_on">Created %1$s</string>
+    <string name="last_added">Last added %1$s</string>
+    <string name="today_at">today %1$s</string>
+    <string name="yesterday_at">yesterday %1$s</string>
+    <string name="position">%1$d of %2$d</string>
+    <string name="err_exists">“%1$s” already exists</string>
+    <string name="err_create">Couldn\'t create folder</string>
+    <string name="err_rename">Couldn\'t rename</string>
+    <string name="err_invalid_name">Invalid name</string>
+    <string name="storage_access_title">Storage access</string>
+    <string name="storage_access_body">Files are saved in Pictures/Onsite, so they stay safe even if the app is uninstalled. To create and move folders there, the app needs “All files access”.</string>
+    <string name="camera_needs_permission">The app needs access to the camera.</string>
+    <string name="save_failed">Couldn\'t save: %1$s</string>
+    <string name="record_failed">Recording failed: %1$s</string>
+    <string name="flash">Flash</string>
+    <string name="torch">Flashlight</string>
+    <string name="exposure">Exposure</string>
+    <string name="exposure_unsupported">Exposure isn\'t supported on this camera</string>
+    <string name="reset">Reset</string>
+    <string name="mode_photo">PHOTO</string>
+    <string name="mode_video">VIDEO</string>
+    <string name="switch_camera">Switch camera</string>
+    <string name="last_capture">Last capture</string>
+    <string name="aspect_ratio">Aspect ratio</string>
+    <string name="video_quality">Video quality</string>
+    <string name="grid">Grid</string>
+    <string name="volume_shutter">Volume keys as shutter</string>
+    <string name="audio_needs_mic">Voice notes need access to the microphone</string>
+    <string name="audio_start_failed">Couldn\'t start recording: %1$s</string>
+    <string name="audio_saved">Voice note saved</string>
+    <string name="audio_too_short">The recording was too short</string>
+    <string name="audio_recording">Recording…</string>
+    <string name="audio_paused">Paused</string>
+    <string name="pause">Pause</string>
+    <string name="resume">Resume</string>
+    <string name="saved_in">Saved in %1$s</string>
+    <string name="save">Save</string>
+    <string name="discard">Discard</string>
+    <string name="sorting">Sorting</string>
+    <string name="sorting_desc">Order of projects and folders</string>
+    <string name="sort_name">Name</string>
+    <string name="sort_recent">Recently changed</string>
+    <string name="video_quality_desc">Higher quality means larger files</string>
+    <string name="grid_desc">Guide lines in the viewfinder</string>
+    <string name="volume_shutter_desc">Take a photo / start video with the volume keys</string>
+    <string name="section_audio">Voice notes</string>
+    <string name="high_audio">High audio quality</string>
+    <string name="high_audio_desc">192 kbit/s instead of 96 kbit/s</string>
+    <string name="section_storage">Storage</string>
+    <string name="show_in_gallery">Show in Gallery</string>
+    <string name="show_in_gallery_desc">Show photos and video from the app in Gallery / Google Photos</string>
+    <string name="location">Location</string>
+    <string name="location_value">Internal storage › Pictures › Onsite</string>
+    <string name="used_space">Space used</string>
+    <string name="calculating">Calculating…</string>
+    <string name="section_language">Language</string>
+    <string name="lang_system">System</string>
+    <string name="section_about">About</string>
+    <string name="version">Version %1$s</string>
+    <plurals name="n_files">
+        <item quantity="one">%d file</item>
+        <item quantity="other">%d files</item>
+    </plurals>
+    <plurals name="n_photos">
+        <item quantity="one">%d photo</item>
+        <item quantity="other">%d photos</item>
+    </plurals>
+    <plurals name="n_videos">
+        <item quantity="one">%d video</item>
+        <item quantity="other">%d videos</item>
+    </plurals>
+    <plurals name="n_voice_notes">
+        <item quantity="one">%d voice note</item>
+        <item quantity="other">%d voice notes</item>
+    </plurals>
+    <plurals name="n_selected">
+        <item quantity="one">%d selected</item>
+        <item quantity="other">%d selected</item>
+    </plurals>
+    <plurals name="delete_n_files_q">
+        <item quantity="one">Delete %d file?</item>
+        <item quantity="other">Delete %d files?</item>
+    </plurals>
+    <plurals name="delete_folder_body">
+        <item quantity="one">The folder, all subfolders and %d file will be permanently deleted.</item>
+        <item quantity="other">The folder, all subfolders and %d files will be permanently deleted.</item>
+    </plurals>
+    <plurals name="moved_n_files_to">
+        <item quantity="one">Moved %1$d file to %2$s</item>
+        <item quantity="other">Moved %1$d files to %2$s</item>
+    </plurals>
+    <plurals name="n_files_size">
+        <item quantity="one">%1$d file · %2$s</item>
+        <item quantity="other">%1$d files · %2$s</item>
+    </plurals>
 </resources>

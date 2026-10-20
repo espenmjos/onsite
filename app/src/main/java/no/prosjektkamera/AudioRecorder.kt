@@ -42,6 +42,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextAlign
@@ -70,7 +71,7 @@ fun AudioRecordDialog(store: PhotoStore, folder: File, onDone: () -> Unit) {
     val launcher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) {
         granted = it
         if (!it) {
-            Toast.makeText(context, "Lydopptak krever tilgang til mikrofonen", Toast.LENGTH_LONG).show()
+            Toast.makeText(context, R.string.audio_needs_mic, Toast.LENGTH_LONG).show()
             onDone()
         }
     }
@@ -98,7 +99,7 @@ fun AudioRecordDialog(store: PhotoStore, folder: File, onDone: () -> Unit) {
                 }
         }.onFailure {
             file.delete()
-            Toast.makeText(context, "Kunne ikke starte opptak: ${it.message}", Toast.LENGTH_LONG).show()
+            Toast.makeText(context, context.getString(R.string.audio_start_failed, it.message), Toast.LENGTH_LONG).show()
         }.getOrNull()
     }
     if (recorder == null) {
@@ -114,10 +115,10 @@ fun AudioRecordDialog(store: PhotoStore, folder: File, onDone: () -> Unit) {
         recorder.release()
         if (save && ok) {
             store.mediaSaved(file)
-            Toast.makeText(context, "Lydopptak lagret", Toast.LENGTH_SHORT).show()
+            Toast.makeText(context, R.string.audio_saved, Toast.LENGTH_SHORT).show()
         } else {
             file.delete()
-            if (save) Toast.makeText(context, "Opptaket var for kort", Toast.LENGTH_SHORT).show()
+            if (save) Toast.makeText(context, R.string.audio_too_short, Toast.LENGTH_SHORT).show()
         }
         onDone()
     }
@@ -150,7 +151,7 @@ fun AudioRecordDialog(store: PhotoStore, folder: File, onDone: () -> Unit) {
                 Icon(Icons.Default.Mic, null, tint = MaterialTheme.colorScheme.error, modifier = Modifier.size(32.dp))
             }
         },
-        title = { Text(if (paused) "Pauset" else "Tar opp lyd …") },
+        title = { Text(stringResource(if (paused) R.string.audio_paused else R.string.audio_recording)) },
         text = {
             Column(Modifier.fillMaxWidth(), horizontalAlignment = Alignment.CenterHorizontally) {
                 Text(formatDuration(elapsed), fontSize = 40.sp, textAlign = TextAlign.Center)
@@ -170,23 +171,23 @@ fun AudioRecordDialog(store: PhotoStore, folder: File, onDone: () -> Unit) {
                     ) {
                         Icon(
                             if (paused) Icons.Default.PlayArrow else Icons.Default.Pause,
-                            if (paused) "Fortsett" else "Pause",
+                            stringResource(if (paused) R.string.resume else R.string.pause),
                         )
                     }
                 }
                 Spacer(Modifier.height(8.dp))
                 Text(
-                    "Lagres i ${folder.name}",
+                    stringResource(R.string.saved_in, folder.name),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                     modifier = Modifier.padding(top = 4.dp),
                 )
             }
         },
-        confirmButton = { TextButton(onClick = { finish(save = true) }) { Text("Lagre") } },
+        confirmButton = { TextButton(onClick = { finish(save = true) }) { Text(stringResource(R.string.save)) } },
         dismissButton = {
             TextButton(onClick = { finish(save = false) }) {
-                Text("Forkast", color = MaterialTheme.colorScheme.error)
+                Text(stringResource(R.string.discard), color = MaterialTheme.colorScheme.error)
             }
         },
     )

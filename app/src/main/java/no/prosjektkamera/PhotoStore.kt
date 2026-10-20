@@ -152,8 +152,8 @@ class PhotoStore(private val context: Context) {
     fun createFolder(parent: File, name: String): Result<File> = runCatching {
         val clean = sanitize(name)
         val dir = File(parent, clean)
-        require(!dir.exists()) { "\"$clean\" finnes allerede" }
-        check(dir.mkdirs()) { "Kunne ikke opprette mappe" }
+        require(!dir.exists()) { context.getString(R.string.err_exists, clean) }
+        check(dir.mkdirs()) { context.getString(R.string.err_create) }
         File(dir, CREATED_FILE).writeText(System.currentTimeMillis().toString())
         changed()
         dir
@@ -161,9 +161,9 @@ class PhotoStore(private val context: Context) {
 
     fun renameFolder(dir: File, newName: String): Result<File> = runCatching {
         val target = File(dir.parentFile, sanitize(newName))
-        require(!target.exists()) { "\"${target.name}\" finnes allerede" }
+        require(!target.exists()) { context.getString(R.string.err_exists, target.name) }
         val before = mediaUnder(dir)
-        check(dir.renameTo(target)) { "Kunne ikke gi nytt navn" }
+        check(dir.renameTo(target)) { context.getString(R.string.err_rename) }
         scan(before + mediaUnder(target))
         changed()
         target
@@ -222,7 +222,7 @@ class PhotoStore(private val context: Context) {
 
     private fun sanitize(name: String): String {
         val s = name.trim().replace(Regex("""[\\/:*?"<>|]"""), "-").trim('.', ' ')
-        require(s.isNotEmpty()) { "Ugyldig navn" }
+        require(s.isNotEmpty()) { context.getString(R.string.err_invalid_name) }
         return s
     }
 }

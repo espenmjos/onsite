@@ -30,6 +30,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -138,11 +139,10 @@ private fun StorageAccessScreen() {
             verticalArrangement = Arrangement.Center,
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
-            Text("Tilgang til lagring", style = MaterialTheme.typography.headlineSmall)
+            Text(stringResource(R.string.storage_access_title), style = MaterialTheme.typography.headlineSmall)
             Spacer(Modifier.height(16.dp))
             Text(
-                "Bildene lagres i Pictures/Onsite, så de ligger trygt selv om appen " +
-                    "avinstalleres. For å lage og flytte mapper der trenger appen «Tilgang til alle filer».",
+                stringResource(R.string.storage_access_body),
                 textAlign = TextAlign.Center,
             )
             Spacer(Modifier.height(24.dp))
@@ -157,7 +157,7 @@ private fun StorageAccessScreen() {
                 } else {
                     legacyLauncher.launch(Manifest.permission.WRITE_EXTERNAL_STORAGE)
                 }
-            }) { Text("Gi tilgang") }
+            }) { Text(stringResource(R.string.grant_access)) }
         }
     }
 }
@@ -170,5 +170,5 @@ fun Context.sharePhotos(files: List<File>) {
     } else {
         Intent(Intent.ACTION_SEND_MULTIPLE).putParcelableArrayListExtra(Intent.EXTRA_STREAM, ArrayList(uris))
     }.setType(files.map { it.mimeType }.distinct().singleOrNull() ?: "*/*").addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
-    startActivity(Intent.createChooser(intent, "Del"))
+    startActivity(Intent.createChooser(intent, getString(R.string.share)))
 }

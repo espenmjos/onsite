@@ -76,6 +76,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.geometry.Offset
@@ -129,11 +130,11 @@ fun CameraScreen(store: PhotoStore, folder: File, onClose: () -> Unit, onOpenPho
                 Modifier.align(Alignment.Center).padding(32.dp),
                 horizontalAlignment = Alignment.CenterHorizontally,
             ) {
-                Text("Appen trenger tilgang til kameraet.", color = Color.White, textAlign = TextAlign.Center)
+                Text(stringResource(R.string.camera_needs_permission), color = Color.White, textAlign = TextAlign.Center)
                 Spacer(Modifier.size(16.dp))
-                Button(onClick = { launcher.launch(Manifest.permission.CAMERA) }) { Text("Gi tilgang") }
+                Button(onClick = { launcher.launch(Manifest.permission.CAMERA) }) { Text(stringResource(R.string.grant_access)) }
                 Spacer(Modifier.size(8.dp))
-                Button(onClick = onClose) { Text("Tilbake") }
+                Button(onClick = onClose) { Text(stringResource(R.string.back)) }
             }
         }
     }
@@ -225,7 +226,7 @@ private fun CameraContent(store: PhotoStore, folder: File, onClose: () -> Unit, 
                 override fun onError(e: ImageCaptureException) {
                     busy = false
                     file.delete()
-                    Toast.makeText(context, "Feil ved lagring: ${e.message}", Toast.LENGTH_LONG).show()
+                    Toast.makeText(context, context.getString(R.string.save_failed, e.message), Toast.LENGTH_LONG).show()
                 }
             },
         )
@@ -247,7 +248,7 @@ private fun CameraContent(store: PhotoStore, folder: File, onClose: () -> Unit, 
                     // SOURCE_INACTIVE means the camera closed mid-recording; the file is still usable.
                     if (event.hasError() && event.error != VideoRecordEvent.Finalize.ERROR_SOURCE_INACTIVE) {
                         file.delete()
-                        Toast.makeText(context, "Feil ved opptak: ${event.cause?.message}", Toast.LENGTH_LONG).show()
+                        Toast.makeText(context, context.getString(R.string.record_failed, event.cause?.message), Toast.LENGTH_LONG).show()
                     } else {
                         last = file
                         taken++
@@ -295,7 +296,7 @@ private fun CameraContent(store: PhotoStore, folder: File, onClose: () -> Unit, 
             // ---- Top bar ----
             Row(Modifier.fillMaxWidth().padding(8.dp), verticalAlignment = Alignment.CenterVertically) {
                 IconButton(onClick = onClose, enabled = !isRecording) {
-                    Icon(Icons.Default.Close, "Lukk", tint = Color.White)
+                    Icon(Icons.Default.Close, stringResource(R.string.close), tint = Color.White)
                 }
                 if (isRecording) {
                     Row(Modifier.weight(1f), horizontalArrangement = Arrangement.Center) {
@@ -311,7 +312,7 @@ private fun CameraContent(store: PhotoStore, folder: File, onClose: () -> Unit, 
                             ImageCapture.FLASH_MODE_OFF -> Icons.Default.FlashOff
                             else -> Icons.Default.FlashAuto
                         },
-                        "Blits", active = prefs.flash != ImageCapture.FLASH_MODE_OFF,
+                        stringResource(R.string.flash), active = prefs.flash != ImageCapture.FLASH_MODE_OFF,
                     ) {
                         prefs.flash = when (prefs.flash) {
                             ImageCapture.FLASH_MODE_AUTO -> ImageCapture.FLASH_MODE_ON
@@ -322,13 +323,13 @@ private fun CameraContent(store: PhotoStore, folder: File, onClose: () -> Unit, 
                 } else {
                     TopIcon(
                         if (torch) Icons.Default.FlashlightOn else Icons.Default.FlashlightOff,
-                        "Lommelykt", active = torch,
+                        stringResource(R.string.torch), active = torch,
                     ) { torch = !torch }
                 }
-                TopIcon(Icons.Default.Exposure, "Eksponering", active = showExposure || exposureIndex != 0) {
+                TopIcon(Icons.Default.Exposure, stringResource(R.string.exposure), active = showExposure || exposureIndex != 0) {
                     showExposure = !showExposure; showSettings = false
                 }
-                TopIcon(Icons.Default.Settings, "Innstillinger", active = showSettings, enabled = !isRecording) {
+                TopIcon(Icons.Default.Settings, stringResource(R.string.settings), active = showSettings, enabled = !isRecording) {
                     showSettings = !showSettings; showExposure = false
                 }
             }
@@ -346,9 +347,9 @@ private fun CameraContent(store: PhotoStore, folder: File, onClose: () -> Unit, 
                 Modifier.fillMaxWidth().padding(top = 12.dp).alpha(if (isRecording) 0f else 1f),
                 horizontalArrangement = Arrangement.Center,
             ) {
-                ModeLabel("FOTO", mode == Mode.PHOTO, enabled = !isRecording) { prefs.cameraMode = Mode.PHOTO.name }
+                ModeLabel(stringResource(R.string.mode_photo), mode == Mode.PHOTO, enabled = !isRecording) { prefs.cameraMode = Mode.PHOTO.name }
                 Spacer(Modifier.width(24.dp))
-                ModeLabel("VIDEO", mode == Mode.VIDEO, enabled = !isRecording) { prefs.cameraMode = Mode.VIDEO.name }
+                ModeLabel(stringResource(R.string.mode_video), mode == Mode.VIDEO, enabled = !isRecording) { prefs.cameraMode = Mode.VIDEO.name }
             }
 
             // ---- Bottom bar: last capture, shutter, camera switch ----
@@ -369,7 +370,7 @@ private fun CameraContent(store: PhotoStore, folder: File, onClose: () -> Unit, 
                     },
                     modifier = Modifier.size(56.dp).clip(CircleShape).background(Color.Black.copy(alpha = 0.4f)),
                 ) {
-                    Icon(Icons.Default.Cameraswitch, "Bytt kamera", tint = Color.White)
+                    Icon(Icons.Default.Cameraswitch, stringResource(R.string.switch_camera), tint = Color.White)
                 }
             }
         }
@@ -440,7 +441,7 @@ private fun LastCaptureThumb(file: File?, taken: Int, enabled: Boolean, onClick:
     ) {
         if (file != null) {
             AsyncImage(
-                model = file, contentDescription = "Siste opptak",
+                model = file, contentDescription = stringResource(R.string.last_capture),
                 contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize(),
             )
             if (file.isVideo) {
@@ -521,7 +522,7 @@ private fun ExposurePanel(controller: LifecycleCameraController, index: Int, onC
     val state = controller.cameraInfo?.exposureState
     Panel {
         if (state == null || !state.isExposureCompensationSupported) {
-            Text("Eksponering støttes ikke på dette kameraet", color = Color.White)
+            Text(stringResource(R.string.exposure_unsupported), color = Color.White)
             return@Panel
         }
         val range = state.exposureCompensationRange
@@ -539,7 +540,7 @@ private fun ExposurePanel(controller: LifecycleCameraController, index: Int, onC
                 modifier = Modifier.weight(1f),
                 colors = SliderDefaults.colors(thumbColor = Accent, activeTrackColor = Accent),
             )
-            Text("Nullstill", color = Color.White, modifier = Modifier.clickable { set(0) }.padding(8.dp))
+            Text(stringResource(R.string.reset), color = Color.White, modifier = Modifier.clickable { set(0) }.padding(8.dp))
         }
     }
 }
@@ -547,19 +548,19 @@ private fun ExposurePanel(controller: LifecycleCameraController, index: Int, onC
 @Composable
 private fun SettingsPanel(prefs: AppSettings) {
     Panel {
-        SettingRow("Bildeformat") {
+        SettingRow(stringResource(R.string.aspect_ratio)) {
             Choice("4:3", !prefs.wide) { prefs.wide = false }
             Choice("16:9", prefs.wide) { prefs.wide = true }
         }
-        SettingRow("Videokvalitet") {
+        SettingRow(stringResource(R.string.video_quality)) {
             AppSettings.videoQualities.forEach { (name, _) ->
                 Choice(name, prefs.videoQuality == name) { prefs.videoQuality = name }
             }
         }
-        SettingRow("Rutenett") {
+        SettingRow(stringResource(R.string.grid)) {
             Switch(checked = prefs.grid, onCheckedChange = { prefs.grid = it })
         }
-        SettingRow("Volumknapper som utløser") {
+        SettingRow(stringResource(R.string.volume_shutter)) {
             Switch(checked = prefs.volumeShutter, onCheckedChange = { prefs.volumeShutter = it })
         }
     }

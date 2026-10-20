@@ -1,6 +1,8 @@
 package no.prosjektkamera
 
+import android.content.Context
 import android.media.MediaMetadataRetriever
+import android.text.format.DateFormat
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.State
 import androidx.compose.runtime.produceState
@@ -12,13 +14,17 @@ import java.util.Calendar
 import java.util.Date
 import java.util.Locale
 
-private val nb = Locale("nb")
+private val Context.locale: Locale get() = resources.configuration.locales[0]
 
-/** "i dag 14:05", "i går 09:12", "3. okt 14:05", or with year if not this year. */
-fun formatWhen(ms: Long): String {
+/** Formats with the best pattern for the app's language, e.g. "3. okt. 2026" vs "Oct 3, 2026". */
+private fun Context.format(skeleton: String, ms: Long): String =
+    SimpleDateFormat(DateFormat.getBestDateTimePattern(locale, skeleton), locale).format(Date(ms))
+
+/** "today 14:05", "yesterday 09:12", "3 Oct 14:05", or the date with year if not this year. */
+fun formatWhen(context: Context, ms: Long): String {
     val then = Calendar.getInstance().apply { timeInMillis = ms }
     val now = Calendar.getInstance()
-    val time = SimpleDateFormat("HH:mm", nb).format(Date(ms))
+    val time = context.format("Hm", ms)
     val daysAgo = run {
         val a = then.clone() as Calendar
         val b = now.clone() as Calendar
@@ -29,15 +35,16 @@ fun formatWhen(ms: Long): String {
         ((b.timeInMillis - a.timeInMillis) / 86_400_000L).toInt()
     }
     return when {
-        daysAgo == 0 -> "i dag $time"
-        daysAgo == 1 -> "i går $time"
-        then.get(Calendar.YEAR) == now.get(Calendar.YEAR) ->
-            SimpleDateFormat("d. MMM HH:mm", nb).format(Date(ms))
-        else -> SimpleDateFormat("d. MMM yyyy", nb).format(Date(ms))
+        daysAgo == 0 -> context.getString(R.string.today_at, time)
+        daysAgo == 1 -> context.getString(R.string.yesterday_at, time)
+        then.get(Calendar.YEAR) == now.get(Calendar.YEAR) -> context.format("dMMMHm", ms)
+        else -> context.format("dMMMyyyy", ms)
     }
 }
 
-fun formatDate(ms: Long): String = SimpleDateFormat("d. MMM yyyy", nb).format(Date(ms))
+fun formatDate(context: Context, ms: Long): String = context.format("dMMMyyyy", ms)
+
+fun formatTime(context: Context, ms: Long): String = context.format("Hm", ms)
 
 fun formatDuration(ms: Long): String {
     val s = ms / 1000
@@ -46,18 +53,19 @@ fun formatDuration(ms: Long): String {
 }
 
 fun formatSize(bytes: Long): String = when {
-    bytes >= 1L shl 30 -> String.format(nb, "%.1f GB", bytes / (1L shl 30).toDouble())
-    bytes >= 1L shl 20 -> String.format(nb, "%.0f MB", bytes / (1L shl 20).toDouble())
-    else -> String.format(nb, "%.0f kB", bytes / 1024.0)
+    bytes >= 1L shl 30 -> String.format("%.1f GB", bytes / (1L shl 30).toDouble())
+    bytes >= 1L shl 20 -> String.format("%.0f MB", bytes / (1L shl 20).toDouble())
+    else -> String.format("%.0f kB", bytes / 1024.0)
 }
 
-/** "12 bilder · 2 videoer · 1 lydopptak" (empty parts left out). */
-fun formatCounts(info: PhotoStore.FolderInfo): String {
-    if (info.total == 0) return "Tom"
+/** "12 photos · 2 videos · 1 voice note" (empty parts left out). */
+fun formatCounts(context: Context, info: PhotoStore.FolderInfo): String {
+    if (info.total == 0) return context.getString(R.string.empty)
+    val res = context.resources
     return listOfNotNull(
-        info.photos.takeIf { it > 0 }?.let { if (it == 1) "1 bilde" else "$it bilder" },
-        info.videos.takeIf { it > 0 }?.let { if (it == 1) "1 video" else "$it videoer" },
-        info.audio.takeIf { it > 0 }?.let { "$it lydopptak" },
+        info.photos.takeIf { it > 0 }?.let { res.getQuantityString(R.plurals.n_photos, it, it) },
+        info.videos.takeIf { it > 0 }?.let { res.getQuantityString(R.plurals.n_videos, it, it) },
+        info.audio.takeIf { it > 0 }?.let { res.getQuantityString(R.plurals.n_voice_notes, it, it) },
     ).joinToString(" · ")
 }
 

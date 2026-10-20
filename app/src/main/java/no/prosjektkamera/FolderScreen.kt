@@ -61,6 +61,8 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.pluralStringResource
+import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.graphics.Color
@@ -121,20 +123,20 @@ fun FolderScreen(
                 navigationIcon = {
                     when {
                         selecting -> IconButton(onClick = { selected = emptySet() }) {
-                            Icon(Icons.Default.Close, "Avbryt valg")
+                            Icon(Icons.Default.Close, stringResource(R.string.cancel_selection))
                         }
                         !isRoot -> IconButton(onClick = onUp) {
-                            Icon(Icons.AutoMirrored.Filled.ArrowBack, "Opp")
+                            Icon(Icons.AutoMirrored.Filled.ArrowBack, stringResource(R.string.up))
                         }
                     }
                 },
                 title = {
                     if (selecting) {
-                        Text("${selected.size} valgt")
+                        Text(pluralStringResource(R.plurals.n_selected, selected.size, selected.size))
                     } else {
                         Column {
                             Text(
-                                if (isRoot) "Prosjekter" else folder.name,
+                                if (isRoot) stringResource(R.string.projects) else folder.name,
                                 maxLines = 1, overflow = TextOverflow.Ellipsis
                             )
                             val parent = folder.parentFile?.let { store.relativePath(it) }
@@ -152,40 +154,40 @@ fun FolderScreen(
                 actions = {
                     if (selecting) {
                         IconButton(onClick = { context.sharePhotos(selected.toList()) }) {
-                            Icon(Icons.Default.Share, "Del")
+                            Icon(Icons.Default.Share, stringResource(R.string.share))
                         }
                         IconButton(onClick = { dialog = FolderDialog.Move }) {
-                            Icon(Icons.AutoMirrored.Filled.DriveFileMove, "Flytt")
+                            Icon(Icons.AutoMirrored.Filled.DriveFileMove, stringResource(R.string.move))
                         }
                         IconButton(onClick = { dialog = FolderDialog.DeletePhotos }) {
-                            Icon(Icons.Default.Delete, "Slett")
+                            Icon(Icons.Default.Delete, stringResource(R.string.delete))
                         }
                     } else {
                         // At the root, new projects are created with the floating button instead.
                         if (!isRoot) {
                             IconButton(onClick = { dialog = FolderDialog.Create }) {
-                                Icon(Icons.Default.CreateNewFolder, "Ny mappe")
+                                Icon(Icons.Default.CreateNewFolder, stringResource(R.string.new_folder))
                             }
                         }
                         if (isRoot) {
                             IconButton(onClick = onOpenSettings) {
-                                Icon(Icons.Default.Settings, "Innstillinger")
+                                Icon(Icons.Default.Settings, stringResource(R.string.settings))
                             }
                         } else {
                             Box {
                                 IconButton(onClick = { menuOpen = true }) {
-                                    Icon(Icons.Default.MoreVert, "Mer")
+                                    Icon(Icons.Default.MoreVert, stringResource(R.string.more))
                                 }
                                 DropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
                                     DropdownMenuItem(
-                                        text = { Text("Del alt i denne mappen") },
+                                        text = { Text(stringResource(R.string.share_all_here)) },
                                         enabled = photos.isNotEmpty(),
                                         onClick = { menuOpen = false; context.sharePhotos(photos) })
                                     DropdownMenuItem(
-                                        text = { Text("Gi nytt navn") },
+                                        text = { Text(stringResource(R.string.rename)) },
                                         onClick = { menuOpen = false; dialog = FolderDialog.Rename })
                                     DropdownMenuItem(
-                                        text = { Text("Slett mappe") },
+                                        text = { Text(stringResource(R.string.delete_folder)) },
                                         onClick = { menuOpen = false; dialog = FolderDialog.DeleteFolder })
                                 }
                             }
@@ -198,15 +200,15 @@ fun FolderScreen(
             if (selecting) return@Scaffold
             if (isRoot) {
                 FloatingActionButton(onClick = { dialog = FolderDialog.Create }) {
-                    Icon(Icons.Default.CreateNewFolder, "Nytt prosjekt")
+                    Icon(Icons.Default.CreateNewFolder, stringResource(R.string.new_project))
                 }
             } else {
                 Column(horizontalAlignment = Alignment.End, verticalArrangement = Arrangement.spacedBy(12.dp)) {
                     FloatingActionButton(onClick = { recordingAudio = true }) {
-                        Icon(Icons.Default.Mic, "Lydopptak")
+                        Icon(Icons.Default.Mic, stringResource(R.string.voice_note))
                     }
                     FloatingActionButton(onClick = onOpenCamera) {
-                        Icon(Icons.Default.PhotoCamera, "Kamera")
+                        Icon(Icons.Default.PhotoCamera, stringResource(R.string.camera))
                     }
                 }
             }
@@ -215,7 +217,7 @@ fun FolderScreen(
         if (isRoot && subfolders.isEmpty()) {
             Box(Modifier.fillMaxSize().padding(padding).padding(32.dp), contentAlignment = Alignment.Center) {
                 Text(
-                    "Ingen prosjekter ennå.\nTrykk på mappeknappen nede til høyre for å starte.\n\nFilene lagres i Pictures/Onsite.",
+                    stringResource(R.string.empty_root),
                     textAlign = TextAlign.Center,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
@@ -242,7 +244,7 @@ fun FolderScreen(
             if (!isRoot && subfolders.isEmpty() && photos.isEmpty()) {
                 item(key = "empty", span = { GridItemSpan(maxLineSpan) }) {
                     Text(
-                        "Tom mappe.\nTa bilder, video eller lydopptak her, eller lag undermapper med mappe-ikonet øverst.",
+                        stringResource(R.string.empty_folder),
                         textAlign = TextAlign.Center,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier.padding(32.dp),
@@ -271,12 +273,12 @@ fun FolderScreen(
                             horizontalAlignment = Alignment.CenterHorizontally,
                         ) {
                             Icon(
-                                Icons.Default.GraphicEq, "Lydopptak",
+                                Icons.Default.GraphicEq, stringResource(R.string.voice_note),
                                 tint = MaterialTheme.colorScheme.onTertiaryContainer,
                                 modifier = Modifier.size(40.dp),
                             )
                             Text(
-                                formatWhen(photo.lastModified()),
+                                formatWhen(context, photo.lastModified()),
                                 style = MaterialTheme.typography.labelSmall,
                                 color = MaterialTheme.colorScheme.onTertiaryContainer,
                             )
@@ -291,7 +293,7 @@ fun FolderScreen(
                     }
                     if (photo.isVideo) {
                         Icon(
-                            Icons.Default.PlayCircle, "Video", tint = Color.White,
+                            Icons.Default.PlayCircle, stringResource(R.string.video), tint = Color.White,
                             modifier = Modifier.align(Alignment.Center).size(36.dp)
                         )
                     }
@@ -325,37 +327,37 @@ fun FolderScreen(
 
     when (dialog) {
         FolderDialog.Create -> NameDialog(
-            title = if (isRoot) "Nytt prosjekt" else "Ny undermappe i «${folder.name}»",
+            title = if (isRoot) stringResource(R.string.new_project) else stringResource(R.string.new_subfolder_in, folder.name),
             initial = "",
             onDismiss = { dialog = null },
             onConfirm = { name ->
                 store.createFolder(folder, name)
                     .onSuccess { dialog = null; onOpenFolder(it) }
-                    .onFailure { toast(it.message ?: "Feil") }
+                    .onFailure { toast(it.message ?: context.getString(R.string.error)) }
             },
         )
         FolderDialog.Rename -> NameDialog(
-            title = "Gi nytt navn",
+            title = stringResource(R.string.rename),
             initial = folder.name,
             onDismiss = { dialog = null },
             onConfirm = { name ->
                 store.renameFolder(folder, name)
                     .onSuccess { dialog = null; onOpenFolder(it) }
-                    .onFailure { toast(it.message ?: "Feil") }
+                    .onFailure { toast(it.message ?: context.getString(R.string.error)) }
             },
         )
         FolderDialog.DeleteFolder -> {
             val n = store.countMediaRecursive(folder)
             ConfirmDialog(
-                title = "Slette «${folder.name}»?",
-                text = "Mappen, alle undermapper og $n fil(er) slettes permanent.",
+                title = stringResource(R.string.delete_folder_q, folder.name),
+                text = pluralStringResource(R.plurals.delete_folder_body, n, n),
                 onDismiss = { dialog = null },
                 onConfirm = { dialog = null; onUp(); store.deleteFolder(folder) },
             )
         }
         FolderDialog.DeletePhotos -> ConfirmDialog(
-            title = "Slette ${selected.size} fil(er)?",
-            text = "Filene slettes permanent.",
+            title = pluralStringResource(R.plurals.delete_n_files_q, selected.size, selected.size),
+            text = stringResource(R.string.files_deleted_permanently),
             onDismiss = { dialog = null },
             onConfirm = { store.deletePhotos(selected); selected = emptySet(); dialog = null },
         )
@@ -367,7 +369,7 @@ fun FolderScreen(
                 val n = selected.size
                 store.movePhotos(selected, dest)
                 selected = emptySet(); dialog = null
-                toast("Flyttet $n fil(er) til ${dest.name}")
+                toast(context.resources.getQuantityString(R.plurals.moved_n_files_to, n, n, dest.name))
             },
         )
         null -> {}
@@ -380,10 +382,11 @@ private fun FolderHeader(info: PhotoStore.FolderInfo) {
         Modifier.fillMaxWidth().padding(horizontal = 12.dp, vertical = 8.dp),
         verticalArrangement = Arrangement.spacedBy(2.dp),
     ) {
-        Text(formatCounts(info), style = MaterialTheme.typography.bodyMedium)
+        val context = LocalContext.current
+        Text(formatCounts(context, info), style = MaterialTheme.typography.bodyMedium)
         Text(
-            "Opprettet ${formatDate(info.created)}" +
-                (info.lastAdded?.let { " · Sist lagt til ${formatWhen(it)}" } ?: ""),
+            stringResource(R.string.created_on, formatDate(context, info.created)) +
+                (info.lastAdded?.let { " · " + stringResource(R.string.last_added, formatWhen(context, it)) } ?: ""),
             style = MaterialTheme.typography.bodySmall,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
@@ -413,10 +416,11 @@ private fun FolderRow(dir: File, info: PhotoStore.FolderInfo, enabled: Boolean, 
         headlineContent = { Text(dir.name, maxLines = 1, overflow = TextOverflow.Ellipsis) },
         supportingContent = {
             Column {
-                Text(formatCounts(info), maxLines = 1, overflow = TextOverflow.Ellipsis)
+                val context = LocalContext.current
+                Text(formatCounts(context, info), maxLines = 1, overflow = TextOverflow.Ellipsis)
                 Text(
-                    info.lastAdded?.let { "Sist lagt til ${formatWhen(it)}" }
-                        ?: "Opprettet ${formatDate(info.created)}",
+                    info.lastAdded?.let { stringResource(R.string.last_added, formatWhen(context, it)) }
+                        ?: stringResource(R.string.created_on, formatDate(context, info.created)),
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant,
                 )
@@ -439,14 +443,14 @@ fun NameDialog(title: String, initial: String, onDismiss: () -> Unit, onConfirm:
         text = {
             OutlinedTextField(
                 value = text, onValueChange = { text = it },
-                singleLine = true, label = { Text("Navn") },
+                singleLine = true, label = { Text(stringResource(R.string.name)) },
                 modifier = Modifier.fillMaxWidth().focusRequester(focus),
             )
         },
         confirmButton = {
-            TextButton(enabled = text.isNotBlank(), onClick = { onConfirm(text) }) { Text("OK") }
+            TextButton(enabled = text.isNotBlank(), onClick = { onConfirm(text) }) { Text(stringResource(R.string.ok)) }
         },
-        dismissButton = { TextButton(onClick = onDismiss) { Text("Avbryt") } },
+        dismissButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.cancel)) } },
     )
 }
 
@@ -457,8 +461,8 @@ fun ConfirmDialog(title: String, text: String, onDismiss: () -> Unit, onConfirm:
         title = { Text(title) },
         text = { Text(text) },
         confirmButton = {
-            TextButton(onClick = onConfirm) { Text("Slett", color = MaterialTheme.colorScheme.error) }
+            TextButton(onClick = onConfirm) { Text(stringResource(R.string.delete), color = MaterialTheme.colorScheme.error) }
         },
-        dismissButton = { TextButton(onClick = onDismiss) { Text("Avbryt") } },
+        dismissButton = { TextButton(onClick = onDismiss) { Text(stringResource(R.string.cancel)) } },
     )
 }

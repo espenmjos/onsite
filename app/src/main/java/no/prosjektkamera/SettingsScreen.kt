@@ -26,6 +26,12 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.pluralStringResource
+import androidx.compose.ui.res.stringResource
+import android.app.LocaleManager
+import android.os.Build
+import android.os.LocaleList
+import androidx.annotation.RequiresApi
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import kotlinx.coroutines.Dispatchers
@@ -48,59 +54,99 @@ fun SettingsScreen(store: PhotoStore, onClose: () -> Unit) {
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Innstillinger") },
+                title = { Text(stringResource(R.string.settings)) },
                 navigationIcon = {
-                    IconButton(onClick = onClose) { Icon(Icons.AutoMirrored.Filled.ArrowBack, "Tilbake") }
+                    IconButton(onClick = onClose) {
+                        Icon(Icons.AutoMirrored.Filled.ArrowBack, stringResource(R.string.back))
+                    }
                 },
             )
         },
     ) { padding ->
         Column(Modifier.fillMaxSize().padding(padding).verticalScroll(rememberScrollState())) {
-            Section("Prosjekter")
-            Choices(
-                "Sortering", "Rekkefølge på prosjekter og mapper",
-                listOf("Navn" to !s.sortByRecent, "Sist endret" to s.sortByRecent),
-            ) { s.sortByRecent = it == 1 }
-
-            Section("Kamera")
-            Choices("Bildeformat", null, listOf("4:3" to !s.wide, "16:9" to s.wide)) { s.wide = it == 1 }
-            Choices(
-                "Videokvalitet", "Høyere kvalitet gir større filer",
-                AppSettings.videoQualities.map { (name, _) -> name to (s.videoQuality == name) },
-            ) { s.videoQuality = AppSettings.videoQualities[it].first }
-            Toggle("Rutenett", "Hjelpelinjer i søkeren", s.grid) { s.grid = it }
-            Toggle("Volumknapper som utløser", "Ta bilde / start video med volumknappene", s.volumeShutter) {
-                s.volumeShutter = it
+            // Per-app language needs Android 13+; older phones just follow the system.
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                Section(stringResource(R.string.section_language))
+                LanguageChoice()
             }
 
-            Section("Lydopptak")
-            Toggle("Høy lydkvalitet", "192 kbit/s i stedet for 96 kbit/s", s.highAudioQuality) {
+            Section(stringResource(R.string.projects))
+            Choices(
+                stringResource(R.string.sorting), stringResource(R.string.sorting_desc),
+                listOf(
+                    stringResource(R.string.sort_name) to !s.sortByRecent,
+                    stringResource(R.string.sort_recent) to s.sortByRecent,
+                ),
+            ) { s.sortByRecent = it == 1 }
+
+            Section(stringResource(R.string.camera))
+            Choices(stringResource(R.string.aspect_ratio), null, listOf("4:3" to !s.wide, "16:9" to s.wide)) {
+                s.wide = it == 1
+            }
+            Choices(
+                stringResource(R.string.video_quality), stringResource(R.string.video_quality_desc),
+                AppSettings.videoQualities.map { (name, _) -> name to (s.videoQuality == name) },
+            ) { s.videoQuality = AppSettings.videoQualities[it].first }
+            Toggle(stringResource(R.string.grid), stringResource(R.string.grid_desc), s.grid) { s.grid = it }
+            Toggle(
+                stringResource(R.string.volume_shutter), stringResource(R.string.volume_shutter_desc),
+                s.volumeShutter,
+            ) { s.volumeShutter = it }
+
+            Section(stringResource(R.string.section_audio))
+            Toggle(stringResource(R.string.high_audio), stringResource(R.string.high_audio_desc), s.highAudioQuality) {
                 s.highAudioQuality = it
             }
 
-            Section("Lagring")
+            Section(stringResource(R.string.section_storage))
             Toggle(
-                "Vis i Galleri",
-                "Vis bilder og video fra appen i Galleri / Google Foto",
+                stringResource(R.string.show_in_gallery), stringResource(R.string.show_in_gallery_desc),
                 galleryVisible,
             ) { store.visibleInGallery = it }
             ListItem(
-                headlineContent = { Text("Plassering") },
-                supportingContent = { Text("Interne lagring › Pictures › Onsite") },
+                headlineContent = { Text(stringResource(R.string.location)) },
+                supportingContent = { Text(stringResource(R.string.location_value)) },
             )
             ListItem(
-                headlineContent = { Text("Brukt plass") },
+                headlineContent = { Text(stringResource(R.string.used_space)) },
                 supportingContent = {
-                    Text(summary?.let { (n, bytes) -> "$n filer · ${formatSize(bytes)}" } ?: "Beregner …")
+                    Text(
+                        summary?.let { (n, bytes) -> pluralStringResource(R.plurals.n_files_size, n, n, formatSize(bytes)) }
+                            ?: stringResource(R.string.calculating)
+                    )
                 },
             )
 
-            Section("Om")
+            Section(stringResource(R.string.section_about))
             ListItem(
-                headlineContent = { Text("Onsite") },
-                supportingContent = { Text("Versjon $appVersion") },
+                headlineContent = { Text(stringResource(R.string.app_name)) },
+                supportingContent = { Text(stringResource(R.string.version, appVersion ?: "")) },
             )
         }
+    }
+}
+
+/**
+ * System / Norsk / English. Uses Android's per-app language, so the choice also
+ * shows up under the app in system settings, and the activity restarts in the new language.
+ */
+@RequiresApi(Build.VERSION_CODES.TIRAMISU)
+@Composable
+private fun LanguageChoice() {
+    val context = LocalContext.current
+    val manager = remember { context.getSystemService(LocaleManager::class.java) }
+    val current = remember { manager.applicationLocales.toLanguageTags() }
+    val options = listOf(
+        "" to stringResource(R.string.lang_system),
+        "nb" to "Norsk",
+        "en" to "English",
+    )
+    Choices(
+        stringResource(R.string.section_language), null,
+        options.map { (tag, label) -> label to (current.substringBefore('-') == tag) },
+    ) { i ->
+        val tag = options[i].first
+        manager.applicationLocales = if (tag.isEmpty()) LocaleList.getEmptyLocaleList() else LocaleList.forLanguageTags(tag)
     }
 }
 
