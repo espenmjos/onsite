@@ -19,6 +19,27 @@
 
 ---
 
+## Screenshots
+
+<table>
+  <tr>
+    <td align="center"><img src="docs/screenshots/projects.png" width="200"><br><sub><b>Projects</b><br>cover, counts, last activity</sub></td>
+    <td align="center"><img src="docs/screenshots/project.png" width="200"><br><sub><b>Project</b><br>folder note &amp; subfolders</sub></td>
+    <td align="center"><img src="docs/screenshots/folder.png" width="200"><br><sub><b>Folder</b><br>photos with note badges</sub></td>
+    <td align="center"><img src="docs/screenshots/viewer.png" width="200"><br><sub><b>Viewer</b><br>note, share, move, delete</sub></td>
+  </tr>
+  <tr>
+    <td align="center"><img src="docs/screenshots/details.png" width="200"><br><sub><b>Details</b><br>time, GPS address, Open in Maps</sub></td>
+    <td align="center"><img src="docs/screenshots/multi-select.png" width="200"><br><sub><b>Multi-select</b><br>share, move or delete in bulk</sub></td>
+    <td align="center"><img src="docs/screenshots/move-to.png" width="200"><br><sub><b>Move to</b><br>browse-style folder picker</sub></td>
+    <td align="center"><img src="docs/screenshots/settings.png" width="200"><br><sub><b>Settings</b><br>language, camera, storage</sub></td>
+  </tr>
+</table>
+
+<sub>Demo photos from <a href="https://unsplash.com">Unsplash</a> (via Lorem Picsum) by Paul Evans, Dietmar Becker,
+Florian Klauer, Alexander Shustov, Steve Richey, Rodrigo Melo, Thanun Buranapong, Johnny Lam, Vadim Sherbakov,
+Aleks Dorohovich, Adam Przewoski and Charlie Foster.</sub>
+
 ## Why Onsite?
 
 Field work produces hundreds of photos across many jobs. In a regular camera app they end up mixed with
