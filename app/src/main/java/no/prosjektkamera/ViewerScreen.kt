@@ -84,9 +84,10 @@ fun ViewerScreen(store: PhotoStore, folder: Doc, initial: Doc, onClose: () -> Un
     val context = LocalContext.current
     val scope = rememberCoroutineScope()
     val version = store.version.intValue
-    val loaded by produceState<List<Doc>?>(null, folder, version) {
-        value = withContext(Dispatchers.IO) { store.media(folder) }
-    }
+    // Start from the cached folder listing so the photo opens instantly; refresh behind it.
+    val cached = remember(folder) { store.cachedFolder(folder) }
+    var loaded by remember(folder) { mutableStateOf(cached?.media) }
+    LaunchedEffect(folder, version) { loaded = withContext(Dispatchers.IO) { store.media(folder) } }
     val photos = loaded
     if (photos == null) {
         Box(Modifier.fillMaxSize().background(Color.Black))
@@ -102,8 +103,15 @@ fun ViewerScreen(store: PhotoStore, folder: Doc, initial: Doc, onClose: () -> Un
     var moving by remember { mutableStateOf(false) }
     var editingNote by remember { mutableStateOf(false) }
     var showDetails by remember { mutableStateOf(false) }
-    val note by produceState<String?>(null, current, version) {
+    val note by produceState(cached?.notes?.get(current), current, version) {
         value = withContext(Dispatchers.IO) { store.note(current) }
+    }
+    // If a refresh adds or removes items, stay on the photo that was showing.
+    var shown by remember { mutableStateOf(initial) }
+    LaunchedEffect(pager.currentPage) { photos.getOrNull(pager.currentPage)?.let { shown = it } }
+    LaunchedEffect(photos) {
+        val idx = photos.indexOf(shown)
+        if (idx >= 0 && idx != pager.currentPage) pager.scrollToPage(idx)
     }
     // Tapping a photo hides/shows the bars, like the system gallery.
     var chrome by remember { mutableStateOf(true) }

@@ -109,12 +109,21 @@ fun FolderScreen(
     val version = store.version.intValue
     val settings = remember { AppSettings.get(context) }
     val scope = rememberCoroutineScope()
-    // Storage calls go through the system's document provider, so load off the main thread.
-    val content by produceState<PhotoStore.FolderContent?>(null, folder, version, settings.sortByRecent) {
-        value = withContext(Dispatchers.IO) { store.loadFolder(folder, settings.sortByRecent) }
+    // Show the last known content instantly, then refresh from storage in the background
+    // and warm up the subfolders so opening them is instant too.
+    var content by remember(folder) { mutableStateOf(store.cachedFolder(folder)) }
+    LaunchedEffect(folder, version) {
+        val fresh = withContext(Dispatchers.IO) { store.loadFolder(folder) }
+        content = fresh
+        withContext(Dispatchers.IO) {
+            store.warmThumbnails(fresh)
+            store.prefetch(fresh.subfolders)
+        }
     }
-    val subfolders = content?.subfolders.orEmpty()
     val infos = content?.infos.orEmpty()
+    val subfolders = content?.subfolders.orEmpty().let { subs ->
+        if (settings.sortByRecent) subs.sortedByDescending { infos[it]?.lastActivity ?: 0L } else subs
+    }
     val photos = content?.media.orEmpty()
     val folderInfo = content?.info
     val noted = content?.noted.orEmpty()
@@ -325,8 +334,9 @@ fun FolderScreen(
                             )
                         }
                     } else {
+                        val thumb by rememberThumb(store, photo)
                         AsyncImage(
-                            model = store.uri(photo),
+                            model = thumb,
                             contentDescription = photo.name,
                             contentScale = ContentScale.Crop,
                             modifier = Modifier.fillMaxSize().padding(if (isSel) 3.dp else 0.dp),
@@ -499,8 +509,9 @@ private fun FolderRow(
                 contentAlignment = Alignment.Center,
             ) {
                 if (info.cover != null) {
+                    val thumb by rememberThumb(store, info.cover)
                     AsyncImage(
-                        model = store.uri(info.cover), contentDescription = null,
+                        model = thumb, contentDescription = null,
                         contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize(),
                     )
                 } else {

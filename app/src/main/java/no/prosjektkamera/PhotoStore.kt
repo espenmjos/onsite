@@ -13,6 +13,10 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import java.io.File
+import java.security.MessageDigest
+import java.util.concurrent.ConcurrentHashMap
+import org.json.JSONArray
+import org.json.JSONObject
 import java.io.InputStream
 import java.io.OutputStream
 import java.text.SimpleDateFormat
@@ -62,6 +66,8 @@ class PhotoStore(private val context: Context) {
 
     val root = Doc("", true)
 
+    val thumbs by lazy { Thumbnails(context, this) }
+
     /** Bumped after every mutation; composables read it to re-load. */
     val version = mutableIntStateOf(0)
 
@@ -83,6 +89,8 @@ class PhotoStore(private val context: Context) {
             runCatching { resolver.releasePersistableUriPermission(it.uri, flags) }
         }
         prefs.edit().putString("treeUri", uri.toString()).apply()
+        folderCache.clear()
+        createdCache.clear()
         treeUri = uri
         init()
         return true
@@ -300,25 +308,115 @@ class PhotoStore(private val context: Context) {
 
     /** Everything a folder screen shows, loaded in one go off the main thread. */
     class FolderContent(
+        val path: String,
+        /** Store [version] when this was loaded; older than the current one means "may be stale". */
+        val version: Int,
+        /** Sorted by name; the screen re-sorts by activity if the user prefers that. */
         val subfolders: List<Doc>,
         val infos: Map<Doc, FolderInfo>,
         val media: List<Doc>,
         val info: FolderInfo?,
-        val noted: Set<Doc>,
+        /** Note text for each file in the folder that has one. */
+        val notes: Map<Doc, String>,
         val note: String?,
-    )
+    ) {
+        val noted: Set<Doc> get() = notes.keys
+    }
 
-    fun loadFolder(dir: Doc, sortByRecent: Boolean): FolderContent {
+    fun loadFolder(dir: Doc): FolderContent {
+        val startVersion = version.intValue
         val kids = children(dir)
         val subs = kids.filter { it.isDirectory && !it.name.startsWith(".") }.sortedBy { it.name.lowercase() }
-        val infos = subs.associateWith { folderInfo(it) }
-        return FolderContent(
-            subfolders = if (sortByRecent) subs.sortedByDescending { infos.getValue(it).lastActivity } else subs,
-            infos = infos,
+        val content = FolderContent(
+            path = dir.path,
+            version = startVersion,
+            subfolders = subs,
+            infos = subs.associateWith { folderInfo(it) },
             media = kids.filter { it.isMedia }.sortedByDescending { it.lastModified },
             info = if (dir.isRoot) null else folderInfo(dir),
-            noted = notedIn(dir, kids),
+            notes = notedIn(dir, kids).mapNotNull { f -> note(f)?.let { f to it } }.toMap(),
             note = if (dir.isRoot) null else note(dir),
+        )
+        folderCache[dir.path] = content
+        runCatching { cacheFile(dir).writeText(content.toJson().toString()) }
+        return content
+    }
+
+    // ---------------------------------------------------------------- folder cache
+    //
+    // Reading a folder through the document provider takes a noticeable moment, so
+    // every screen first shows the last known content (memory, else a small JSON file
+    // that survives restarts) and refreshes it in the background.
+
+    private val folderCache = ConcurrentHashMap<String, FolderContent>()
+    private val createdCache = ConcurrentHashMap<String, Long>()
+    private val cacheDir get() = File(context.cacheDir, "folders").apply { mkdirs() }
+
+    private fun cacheFile(dir: Doc): File {
+        val key = MessageDigest.getInstance("SHA-1").digest("${treeUri}|${dir.path}".toByteArray())
+            .joinToString("") { "%02x".format(it) }
+        return File(cacheDir, "$key.json")
+    }
+
+    /** The last known content of [dir], immediately, or null if it has never been loaded. */
+    fun cachedFolder(dir: Doc): FolderContent? {
+        if (treeUri == null) return null
+        folderCache[dir.path]?.let { return it }
+        return runCatching { folderFromJson(JSONObject(cacheFile(dir).readText())) }.getOrNull()
+            ?.takeIf { it.path == dir.path }
+            ?.copyAsStale()
+            ?.also { folderCache[dir.path] = it }
+    }
+
+    /** Thumbnails a folder screen for [content] shows: its first photos and its subfolders' covers. */
+    fun warmThumbnails(content: FolderContent) =
+        thumbs.warm(content.infos.values.mapNotNull { it.cover } + content.media.take(WARM_THUMBS))
+
+    /** Loads the given folders (and their thumbnails) in the background so opening them is instant. */
+    fun prefetch(dirs: List<Doc>) {
+        dirs.forEach { d ->
+            val content = folderCache[d.path]?.takeIf { it.version == version.intValue }
+                ?: runCatching { loadFolder(d) }.getOrNull() ?: return@forEach
+            warmThumbnails(content)
+        }
+    }
+
+    private fun FolderContent.copyAsStale() =
+        FolderContent(path, -1, subfolders, infos, media, info, notes, note)
+
+    private fun Doc.toJson() = JSONObject().put("p", path).put("d", isDirectory).put("l", length).put("m", lastModified)
+    private fun docFromJson(o: JSONObject) = Doc(o.getString("p"), o.getBoolean("d"), o.getLong("l"), o.getLong("m"))
+
+    private fun FolderInfo.toJson() = JSONObject().put("c", created).put("la", lastAdded ?: -1L)
+        .put("ph", photos).put("vi", videos).put("au", audio).put("cv", cover?.toJson() ?: JSONObject.NULL)
+    private fun infoFromJson(o: JSONObject) = FolderInfo(
+        o.getLong("c"), o.getLong("la").takeIf { it >= 0 }, o.getInt("ph"), o.getInt("vi"), o.getInt("au"),
+        o.optJSONObject("cv")?.let { docFromJson(it) },
+    )
+
+    private fun FolderContent.toJson(): JSONObject = JSONObject()
+        .put("path", path)
+        .put("sub", JSONArray(subfolders.map { it.toJson() }))
+        .put("infos", JSONObject().apply { infos.forEach { (d, i) -> put(d.path, i.toJson()) } })
+        .put("media", JSONArray(media.map { it.toJson() }))
+        .put("info", info?.toJson() ?: JSONObject.NULL)
+        .put("notes", JSONObject().apply { notes.forEach { (d, t) -> put(d.path, t) } })
+        .put("note", note ?: JSONObject.NULL)
+
+    private fun folderFromJson(o: JSONObject): FolderContent {
+        fun docs(a: JSONArray) = (0 until a.length()).map { docFromJson(a.getJSONObject(it)) }
+        val subs = docs(o.getJSONArray("sub"))
+        val infos = o.getJSONObject("infos")
+        val notes = o.getJSONObject("notes")
+        return FolderContent(
+            path = o.getString("path"),
+            version = -1,
+            subfolders = subs,
+            infos = subs.associateWith { infoFromJson(infos.getJSONObject(it.path)) },
+            media = docs(o.getJSONArray("media")),
+            info = o.optJSONObject("info")?.let { infoFromJson(it) },
+            notes = notes.keys().asSequence().associate { Doc(it, false) to notes.getString(it) },
+            note = if (o.isNull("note")) null else o.getString("note"),
         )
     }
 
@@ -337,10 +435,13 @@ class PhotoStore(private val context: Context) {
      * written down so it stays stable.
      */
     private fun createdAt(dir: Doc, files: List<Doc>): Long {
-        readText(dir.child(CREATED_FILE))?.trim()?.toLongOrNull()?.let { return it }
-        val guess = files.minOfOrNull { it.lastModified } ?: System.currentTimeMillis()
-        runCatching { writeText(dir, CREATED_FILE, guess.toString()) }
-        return guess
+        createdCache[dir.path]?.let { return it }
+        val stored = readText(dir.child(CREATED_FILE))?.trim()?.toLongOrNull()
+        val created = stored ?: (files.minOfOrNull { it.lastModified } ?: System.currentTimeMillis()).also { guess ->
+            runCatching { writeText(dir, CREATED_FILE, guess.toString()) }
+        }
+        createdCache[dir.path] = created
+        return created
     }
 
     fun storageSummary(): Pair<Int, Long> {
@@ -531,6 +632,7 @@ class PhotoStore(private val context: Context) {
         private const val TRASH = ".papirkurv"
         private val SIDECAR_SUFFIXES = listOf(".notat.txt", ".adresse.txt")
         const val TRASH_DAYS = 30
+        private const val WARM_THUMBS = 30
 
         /** Where the folder picker should open: Pictures/Onsite (created if possible), else Pictures. */
         fun suggestedStartUri(): Uri {
