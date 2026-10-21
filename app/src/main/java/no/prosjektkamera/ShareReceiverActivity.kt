@@ -162,6 +162,9 @@ class ShareReceiverActivity : ComponentActivity() {
      */
     private fun toMediaStoreUri(uri: Uri): Uri? {
         if (uri.authority == MediaStore.AUTHORITY) return uri
+        // Gallery apps such as Google Photos wrap the MediaStore URI inside their own, URL-encoded.
+        Regex("""content://media/[\w-]+/(?:images|video|audio|file)/media/\d+|content://media/[\w-]+/file/\d+""")
+            .find(Uri.decode(uri.toString()))?.let { return Uri.parse(it.value) }
         val path = runCatching {
             contentResolver.query(uri, arrayOf(MediaStore.MediaColumns.DATA), null, null, null)?.use { c ->
                 if (c.moveToFirst()) c.getString(0) else null
@@ -173,16 +176,22 @@ class ShareReceiverActivity : ComponentActivity() {
         )?.use { c -> if (c.moveToFirst()) android.content.ContentUris.withAppendedId(files, c.getLong(0)) else null }
     }
 
-    private fun sharedUris(intent: Intent): List<Uri> = when (intent.action) {
-        Intent.ACTION_SEND -> listOfNotNull(
-            if (Build.VERSION.SDK_INT >= 33) intent.getParcelableExtra(Intent.EXTRA_STREAM, Uri::class.java)
-            else @Suppress("DEPRECATION") intent.getParcelableExtra(Intent.EXTRA_STREAM)
-        )
-        Intent.ACTION_SEND_MULTIPLE ->
-            (if (Build.VERSION.SDK_INT >= 33) intent.getParcelableArrayListExtra(Intent.EXTRA_STREAM, Uri::class.java)
-            else @Suppress("DEPRECATION") intent.getParcelableArrayListExtra(Intent.EXTRA_STREAM)).orEmpty()
-        else -> emptyList()
+    private fun sharedUris(intent: Intent): List<Uri> {
+        val fromExtras: List<Uri> = when (intent.action) {
+            Intent.ACTION_SEND -> listOfNotNull(
+                if (Build.VERSION.SDK_INT >= 33) intent.getParcelableExtra(Intent.EXTRA_STREAM, Uri::class.java)
+                else @Suppress("DEPRECATION") intent.getParcelableExtra(Intent.EXTRA_STREAM)
+            )
+            Intent.ACTION_SEND_MULTIPLE ->
+                (if (Build.VERSION.SDK_INT >= 33) intent.getParcelableArrayListExtra(Intent.EXTRA_STREAM, Uri::class.java)
+                else @Suppress("DEPRECATION") intent.getParcelableArrayListExtra(Intent.EXTRA_STREAM)).orEmpty()
+            else -> emptyList()
+        }
+        // Some apps (e.g. Google Photos) only put the items in ClipData.
+        val fromClip = intent.clipData?.let { clip -> (0 until clip.itemCount).mapNotNull { clip.getItemAt(it).uri } }.orEmpty()
+        return (fromExtras + fromClip).distinct()
     }
+
 
     /** Copies one shared item into [dest], keeping its name. */
     private fun copyIn(store: PhotoStore, uri: Uri, dest: Doc): Doc? = runCatching {
@@ -192,7 +201,10 @@ class ShareReceiverActivity : ComponentActivity() {
         }
         val ext = contentResolver.getType(uri)?.let { MimeTypeMap.getSingleton().getExtensionFromMimeType(it) } ?: "jpg"
         val target = store.newImport(dest, name ?: uri.lastPathSegment ?: "", ext)
-        val bytes = contentResolver.openInputStream(uri)!!.use { input -> store.openOutput(target).use { input.copyTo(it) } }
+        // Never leave an empty or half-written file behind if reading the shared item fails.
+        val bytes = runCatching {
+            contentResolver.openInputStream(uri)!!.use { input -> store.openOutput(target).use { input.copyTo(it) } }
+        }.getOrElse { store.discard(target); throw it }
         // Verify the copy before it can ever replace the original.
         val expected = runCatching {
             contentResolver.query(uri, arrayOf(OpenableColumns.SIZE), null, null, null)?.use { c ->
