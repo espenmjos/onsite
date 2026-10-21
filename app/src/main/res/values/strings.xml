@@ -50,8 +50,8 @@
     <string name="err_create">Couldn\'t create folder</string>
     <string name="err_rename">Couldn\'t rename</string>
     <string name="err_invalid_name">Invalid name</string>
-    <string name="storage_access_title">Storage access</string>
-    <string name="storage_access_body">Files are saved in Pictures/Onsite, so they stay safe even if the app is uninstalled. To create and move folders there, the app needs “All files access”.</string>
+    <string name="storage_access_title">Choose a storage folder</string>
+    <string name="storage_access_body">Onsite saves photos, video and voice notes as normal files in a folder on your phone, so they\'re kept even if the app is uninstalled.\n\nTap the button, check that the folder is Pictures › Onsite, then tap “Use this folder” and “Allow”.</string>
     <string name="camera_needs_permission">The app needs access to the camera.</string>
     <string name="save_failed">Couldn\'t save: %1$s</string>
     <string name="record_failed">Recording failed: %1$s</string>
@@ -212,4 +212,7 @@
         <item quantity="one">Moved %1$d file to %2$s</item>
         <item quantity="other">Moved %1$d files to %2$s</item>
     </plurals>
+    <string name="choose_folder">Choose folder</string>
+    <string name="change_folder">Change folder</string>
+    <string name="folder_not_supported">Please choose a folder on the phone\'s own storage</string>
 </resources>

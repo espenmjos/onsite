@@ -14,7 +14,8 @@ import androidx.camera.core.ImageCaptureException
 import androidx.camera.core.resolutionselector.AspectRatioStrategy
 import androidx.camera.core.resolutionselector.ResolutionSelector
 import androidx.camera.video.FallbackStrategy
-import androidx.camera.video.FileOutputOptions
+import androidx.camera.video.FileDescriptorOutputOptions
+import android.net.Uri
 import androidx.camera.video.QualitySelector
 import androidx.camera.video.Recording
 import androidx.camera.video.VideoRecordEvent
@@ -120,7 +121,7 @@ private val Accent = Color(0xFFFFC400)
 private val RecordRed = Color(0xFFE53935)
 
 @Composable
-fun CameraScreen(store: PhotoStore, folder: File, onClose: () -> Unit, onOpenPhoto: (File) -> Unit) {
+fun CameraScreen(store: PhotoStore, folder: Doc, onClose: () -> Unit, onOpenPhoto: (Doc) -> Unit) {
     val context = LocalContext.current
     var granted by remember { mutableStateOf(context.hasPermission(Manifest.permission.CAMERA)) }
     val launcher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted = it }
@@ -146,7 +147,7 @@ fun CameraScreen(store: PhotoStore, folder: File, onClose: () -> Unit, onOpenPho
 
 @SuppressLint("MissingPermission") // audio is only enabled when RECORD_AUDIO is granted
 @Composable
-private fun CameraContent(store: PhotoStore, folder: File, onClose: () -> Unit, onOpenPhoto: (File) -> Unit) {
+private fun CameraContent(store: PhotoStore, folder: Doc, onClose: () -> Unit, onOpenPhoto: (Doc) -> Unit) {
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
     val scope = rememberCoroutineScope()
@@ -194,7 +195,8 @@ private fun CameraContent(store: PhotoStore, folder: File, onClose: () -> Unit, 
     var showSettings by remember { mutableStateOf(false) }
 
     var busy by remember { mutableStateOf(false) }
-    var last by remember { mutableStateOf(store.media(folder).firstOrNull()) }
+    var last by remember { mutableStateOf<Doc?>(null) }
+    LaunchedEffect(folder) { last = withContext(Dispatchers.IO) { store.media(folder).firstOrNull() } }
     var taken by remember { mutableIntStateOf(0) }
     val flashAlpha = remember { Animatable(0f) }
 
@@ -233,13 +235,14 @@ private fun CameraContent(store: PhotoStore, folder: File, onClose: () -> Unit, 
     fun stampLines(): List<String> = if (!prefs.stampEnabled) emptyList() else listOfNotNull(
         formatDateTime(context, System.currentTimeMillis()),
         if (useLocation) tracker.describe() else null,
-        store.relativePath(folder).replace("/", " › "),
+        folder.path.replace("/", " › "),
     )
 
     fun takePhoto() {
         if (busy) return
         busy = true
-        val file = store.newPhotoFile(folder)
+        // Capture to the app cache first (the stamp needs a real file), then copy into the project.
+        val file = File(context.cacheDir, "capture_${System.nanoTime()}.jpg")
         val lines = stampLines()
         val metadata = ImageCapture.Metadata().apply { if (useLocation) location = tracker.location }
         scope.launch {
@@ -255,12 +258,18 @@ private fun CameraContent(store: PhotoStore, folder: File, onClose: () -> Unit, 
                     // Stamping takes ~1 s, so do it off the main thread in an app-wide scope
                     // that survives leaving the camera; the shutter is free again right away.
                     AppScope.launch {
-                        if (lines.isNotEmpty()) {
-                            withContext(Dispatchers.IO) { runCatching { Stamper.stamp(file, lines) } }
+                        val doc = withContext(Dispatchers.IO) {
+                            if (lines.isNotEmpty()) runCatching { Stamper.stamp(file, lines) }
+                            runCatching {
+                                store.newPhoto(folder).also { store.writeFrom(it, file); store.mediaSaved(it) }
+                            }.also { file.delete() }.getOrNull()
                         }
-                        last = file
-                        taken++
-                        store.mediaSaved(file)
+                        if (doc != null) {
+                            last = doc
+                            taken++
+                        } else {
+                            Toast.makeText(context, context.getString(R.string.save_failed, ""), Toast.LENGTH_LONG).show()
+                        }
                     }
                 }
 
@@ -275,10 +284,15 @@ private fun CameraContent(store: PhotoStore, folder: File, onClose: () -> Unit, 
 
     fun toggleRecording() {
         recording?.let { it.stop(); recording = null; return }
-        val file = store.newVideoFile(folder)
+        // Video is written straight into a new document in the project folder.
+        val doc = runCatching { store.newVideo(folder) }.getOrElse {
+            Toast.makeText(context, context.getString(R.string.record_failed, it.message), Toast.LENGTH_LONG).show()
+            return
+        }
+        val fd = store.openFd(doc, "rw")
         recordNanos = 0
         recording = controller.startRecording(
-            FileOutputOptions.Builder(file).apply { if (useLocation) setLocation(tracker.location) }.build(),
+            FileDescriptorOutputOptions.Builder(fd).apply { if (useLocation) setLocation(tracker.location) }.build(),
             AudioConfig.create(context.hasPermission(Manifest.permission.RECORD_AUDIO)),
             ContextCompat.getMainExecutor(context),
         ) { event ->
@@ -286,14 +300,15 @@ private fun CameraContent(store: PhotoStore, folder: File, onClose: () -> Unit, 
                 is VideoRecordEvent.Status -> recordNanos = event.recordingStats.recordedDurationNanos
                 is VideoRecordEvent.Finalize -> {
                     recording = null
+                    fd.close()
                     // SOURCE_INACTIVE means the camera closed mid-recording; the file is still usable.
                     if (event.hasError() && event.error != VideoRecordEvent.Finalize.ERROR_SOURCE_INACTIVE) {
-                        file.delete()
+                        AppScope.launch(Dispatchers.IO) { store.discard(doc) }
                         Toast.makeText(context, context.getString(R.string.record_failed, event.cause?.message), Toast.LENGTH_LONG).show()
                     } else {
-                        last = file
+                        last = doc
                         taken++
-                        store.mediaSaved(file)
+                        AppScope.launch(Dispatchers.IO) { store.mediaSaved(doc) }
                     }
                 }
             }
@@ -344,7 +359,7 @@ private fun CameraContent(store: PhotoStore, folder: File, onClose: () -> Unit, 
                         RecordingBadge(recordNanos)
                     }
                 } else {
-                    FolderBadge(store.relativePath(folder).replace("/", " › "), Modifier.weight(1f))
+                    FolderBadge(folder.path.replace("/", " › "), Modifier.weight(1f))
                 }
                 if (mode == Mode.PHOTO) {
                     TopIcon(
@@ -399,7 +414,7 @@ private fun CameraContent(store: PhotoStore, folder: File, onClose: () -> Unit, 
                 horizontalArrangement = Arrangement.SpaceBetween,
                 verticalAlignment = Alignment.CenterVertically,
             ) {
-                LastCaptureThumb(last, taken, enabled = !isRecording) { last?.let(onOpenPhoto) }
+                LastCaptureThumb(last, last?.let { store.uri(it) }, taken, enabled = !isRecording) { last?.let(onOpenPhoto) }
                 ShutterButton(mode, isRecording, busy, ::shutter)
                 IconButton(
                     enabled = !isRecording,
@@ -473,7 +488,7 @@ private fun ModeLabel(text: String, selected: Boolean, enabled: Boolean, onClick
 }
 
 @Composable
-private fun LastCaptureThumb(file: File?, taken: Int, enabled: Boolean, onClick: () -> Unit) {
+private fun LastCaptureThumb(file: Doc?, uri: Uri?, taken: Int, enabled: Boolean, onClick: () -> Unit) {
     Box(
         Modifier.size(56.dp).clip(RoundedCornerShape(8.dp))
             .background(Color.DarkGray)
@@ -482,7 +497,7 @@ private fun LastCaptureThumb(file: File?, taken: Int, enabled: Boolean, onClick:
     ) {
         if (file != null) {
             AsyncImage(
-                model = file, contentDescription = stringResource(R.string.last_capture),
+                model = uri, contentDescription = stringResource(R.string.last_capture),
                 contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize(),
             )
             if (file.isVideo) {

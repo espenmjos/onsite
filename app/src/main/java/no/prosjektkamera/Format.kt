@@ -8,7 +8,7 @@ import androidx.compose.runtime.State
 import androidx.compose.runtime.produceState
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
-import java.io.File
+import androidx.compose.ui.platform.LocalContext
 import java.text.SimpleDateFormat
 import java.util.Calendar
 import java.util.Date
@@ -75,15 +75,16 @@ private val durationCache = HashMap<String, Long>()
 
 /** Duration of a video/audio file, read off the main thread and cached. */
 @Composable
-fun rememberDuration(file: File): State<Long?> {
-    val key = "${file.path}:${file.lastModified()}"
+fun rememberDuration(store: PhotoStore, doc: Doc): State<Long?> {
+    val context = LocalContext.current
+    val key = "${doc.path}:${doc.lastModified}"
     return produceState(durationCache[key], key) {
         if (value != null) return@produceState
         value = withContext(Dispatchers.IO) {
             runCatching {
                 MediaMetadataRetriever().run {
                     try {
-                        setDataSource(file.path)
+                        setDataSource(context, store.uri(doc))
                         extractMetadata(MediaMetadataRetriever.METADATA_KEY_DURATION)?.toLongOrNull()
                     } finally {
                         release()

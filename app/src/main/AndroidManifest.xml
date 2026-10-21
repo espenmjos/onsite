@@ -6,16 +6,11 @@
     <uses-permission android:name="android.permission.RECORD_AUDIO" />
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
-    <!-- Photos live in Pictures/Onsite, which needs broad file access:
-         legacy write permission up to Android 10, "All files access" from 11. -->
-    <uses-permission
-        android:name="android.permission.WRITE_EXTERNAL_STORAGE"
-        android:maxSdkVersion="29" />
-    <uses-permission android:name="android.permission.MANAGE_EXTERNAL_STORAGE" />
+    <!-- Storage needs no permission: the user grants access to one folder (normally
+         Pictures/Onsite) through the system folder picker. -->
 
     <application
         android:allowBackup="true"
-        android:requestLegacyExternalStorage="true"
         android:localeConfig="@xml/locales_config"
         android:icon="@mipmap/ic_launcher"
         android:label="@string/app_name"
@@ -49,14 +44,5 @@
             </intent-filter>
         </activity>
 
-        <provider
-            android:name="androidx.core.content.FileProvider"
-            android:authorities="${applicationId}.files"
-            android:exported="false"
-            android:grantUriPermissions="true">
-            <meta-data
-                android:name="android.support.FILE_PROVIDER_PATHS"
-                android:resource="@xml/file_paths" />
-        </provider>
     </application>
 </manifest>

@@ -38,7 +38,6 @@ import androidx.lifecycle.lifecycleScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
-import java.io.File
 
 /**
  * Receives photos/videos/audio shared from other apps ("Share → Onsite"), lets the
@@ -67,8 +66,8 @@ class ShareReceiverActivity : ComponentActivity() {
 
         setContent {
             MaterialTheme(colorScheme = if (isSystemInDarkTheme()) OnsiteDark else OnsiteLight) {
-                if (!hasStorageAccess(this)) {
-                    StorageAccessScreen()
+                if (store.treeUri == null) {
+                    StorageAccessScreen(store)
                     return@MaterialTheme
                 }
                 var saving by remember { mutableStateOf(false) }
@@ -90,7 +89,7 @@ class ShareReceiverActivity : ComponentActivity() {
                     exclude = store.root,
                     title = pluralStringResource(R.plurals.save_n_to_onsite, uris.size, uris.size),
                     confirmLabel = stringResource(R.string.save_here),
-                    start = File(store.root, settings.lastImportFolder),
+                    start = Doc(settings.lastImportFolder, true),
                     extra = {
                         Row(
                             Modifier.fillMaxWidth().clickable { settings.importMove = !settings.importMove }
@@ -111,13 +110,13 @@ class ShareReceiverActivity : ComponentActivity() {
                     onDismiss = { finish() },
                     onPick = { dest ->
                         saving = true
-                        settings.lastImportFolder = store.relativePath(dest)
+                        settings.lastImportFolder = dest.path
                         val move = settings.importMove
                         lifecycleScope.launch {
                             val copied = withContext(Dispatchers.IO) {
                                 uris.mapNotNull { uri -> copyIn(store, uri, dest)?.let { uri to it } }
                             }
-                            store.imported(copied.map { it.second })
+                            withContext(Dispatchers.IO) { store.mediaSaved(copied.map { it.second }) }
                             val saved = copied.size
                             val msg = when {
                                 saved < uris.size -> getString(R.string.saved_some, saved, uris.size)
@@ -185,36 +184,25 @@ class ShareReceiverActivity : ComponentActivity() {
         else -> emptyList()
     }
 
-    /** Copies one shared item into [dest], keeping its name and (if known) its original date. */
-    private fun copyIn(store: PhotoStore, uri: Uri, dest: File): File? = runCatching {
+    /** Copies one shared item into [dest], keeping its name. */
+    private fun copyIn(store: PhotoStore, uri: Uri, dest: Doc): Doc? = runCatching {
         var name: String? = null
-        var modified: Long? = null
-        contentResolver.query(uri, null, null, null, null)?.use { c ->
-            if (c.moveToFirst()) {
-                c.getColumnIndex(OpenableColumns.DISPLAY_NAME).takeIf { it >= 0 }?.let { name = c.getString(it) }
-                // Prefer when the photo was taken; fall back to last modified (seconds).
-                c.getColumnIndex(MediaStore.MediaColumns.DATE_TAKEN).takeIf { it >= 0 }
-                    ?.let { i -> c.getLong(i).takeIf { it > 0 } }?.let { modified = it }
-                if (modified == null) {
-                    c.getColumnIndex(MediaStore.MediaColumns.DATE_MODIFIED).takeIf { it >= 0 }
-                        ?.let { i -> c.getLong(i).takeIf { it > 0 } }?.let { modified = it * 1000 }
-                }
-            }
+        contentResolver.query(uri, arrayOf(OpenableColumns.DISPLAY_NAME), null, null, null)?.use { c ->
+            if (c.moveToFirst() && !c.isNull(0)) name = c.getString(0)
         }
         val ext = contentResolver.getType(uri)?.let { MimeTypeMap.getSingleton().getExtensionFromMimeType(it) } ?: "jpg"
-        val target = store.newImportFile(dest, name ?: uri.lastPathSegment ?: "", ext)
-        val bytes = contentResolver.openInputStream(uri)!!.use { input -> target.outputStream().use { input.copyTo(it) } }
+        val target = store.newImport(dest, name ?: uri.lastPathSegment ?: "", ext)
+        val bytes = contentResolver.openInputStream(uri)!!.use { input -> store.openOutput(target).use { input.copyTo(it) } }
         // Verify the copy before it can ever replace the original.
         val expected = runCatching {
             contentResolver.query(uri, arrayOf(OpenableColumns.SIZE), null, null, null)?.use { c ->
                 if (c.moveToFirst() && !c.isNull(0)) c.getLong(0) else null
             }
         }.getOrNull()
-        if (bytes == 0L || target.length() != bytes || (expected != null && expected != bytes)) {
-            target.delete()
+        if (bytes == 0L || store.sizeOf(target) != bytes || (expected != null && expected != bytes)) {
+            store.discard(target)
             return@runCatching null
         }
-        modified?.let { target.setLastModified(it) }
         target
     }.getOrNull()
 }

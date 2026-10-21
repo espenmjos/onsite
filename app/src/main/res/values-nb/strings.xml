@@ -49,8 +49,8 @@
     <string name="err_create">Kunne ikke opprette mappe</string>
     <string name="err_rename">Kunne ikke gi nytt navn</string>
     <string name="err_invalid_name">Ugyldig navn</string>
-    <string name="storage_access_title">Tilgang til lagring</string>
-    <string name="storage_access_body">Filene lagres i Pictures/Onsite, så de ligger trygt selv om appen avinstalleres. For å lage og flytte mapper der trenger appen «Tilgang til alle filer».</string>
+    <string name="storage_access_title">Velg lagringsmappe</string>
+    <string name="storage_access_body">Onsite lagrer bilder, video og lydopptak som vanlige filer i en mappe på telefonen, så de ligger trygt selv om appen avinstalleres.\n\nTrykk på knappen, sjekk at mappen er Pictures › Onsite, og trykk «Bruk denne mappen» og «Tillat».</string>
     <string name="camera_needs_permission">Appen trenger tilgang til kameraet.</string>
     <string name="save_failed">Feil ved lagring: %1$s</string>
     <string name="record_failed">Feil ved opptak: %1$s</string>
@@ -211,4 +211,7 @@
         <item quantity="one">Flyttet %1$d fil til %2$s</item>
         <item quantity="other">Flyttet %1$d filer til %2$s</item>
     </plurals>
+    <string name="choose_folder">Velg mappe</string>
+    <string name="change_folder">Bytt mappe</string>
+    <string name="folder_not_supported">Velg en mappe på telefonens egen lagring</string>
 </resources>

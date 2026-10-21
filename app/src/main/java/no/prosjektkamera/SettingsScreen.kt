@@ -29,6 +29,12 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.pluralStringResource
 import androidx.compose.ui.res.stringResource
 import android.app.LocaleManager
+import android.widget.Toast
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.material3.TextButton
+import androidx.compose.runtime.rememberCoroutineScope
+import kotlinx.coroutines.launch
 import android.os.Build
 import android.os.LocaleList
 import androidx.annotation.RequiresApi
@@ -43,7 +49,15 @@ fun SettingsScreen(store: PhotoStore, onClose: () -> Unit) {
     val context = LocalContext.current
     val s = remember { AppSettings.get(context) }
     val version = store.version.intValue
-    val galleryVisible = remember(version) { store.visibleInGallery }
+    val scope = rememberCoroutineScope()
+    val galleryVisible by produceState(false, version) {
+        value = withContext(Dispatchers.IO) { store.isVisibleInGallery() }
+    }
+    val picker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocumentTree()) { uri ->
+        if (uri != null && !store.adoptTree(uri)) {
+            Toast.makeText(context, R.string.folder_not_supported, Toast.LENGTH_LONG).show()
+        }
+    }
     val summary by produceState<Pair<Int, Long>?>(null, version) {
         value = withContext(Dispatchers.IO) { store.storageSummary() }
     }
@@ -111,10 +125,13 @@ fun SettingsScreen(store: PhotoStore, onClose: () -> Unit) {
             Toggle(
                 stringResource(R.string.show_in_gallery), stringResource(R.string.show_in_gallery_desc),
                 galleryVisible,
-            ) { store.visibleInGallery = it }
+            ) { visible -> scope.launch(Dispatchers.IO) { store.setVisibleInGallery(visible) } }
             ListItem(
                 headlineContent = { Text(stringResource(R.string.location)) },
-                supportingContent = { Text(stringResource(R.string.location_value)) },
+                supportingContent = { Text(store.locationLabel ?: "") },
+                trailingContent = {
+                    TextButton(onClick = { picker.launch(store.treeUri) }) { Text(stringResource(R.string.change_folder)) }
+                },
             )
             ListItem(
                 headlineContent = { Text(stringResource(R.string.used_space)) },

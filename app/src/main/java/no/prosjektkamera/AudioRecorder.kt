@@ -51,7 +51,9 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.DialogProperties
 import androidx.core.content.ContextCompat
 import kotlinx.coroutines.delay
-import java.io.File
+import android.os.ParcelFileDescriptor
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 import kotlin.math.log10
 
 /**
@@ -60,7 +62,7 @@ import kotlin.math.log10
  * explicitly.
  */
 @Composable
-fun AudioRecordDialog(store: PhotoStore, folder: File, onDone: () -> Unit) {
+fun AudioRecordDialog(store: PhotoStore, folder: Doc, onDone: () -> Unit) {
     val context = LocalContext.current
     var granted by remember {
         mutableStateOf(
@@ -79,7 +81,10 @@ fun AudioRecordDialog(store: PhotoStore, folder: File, onDone: () -> Unit) {
     if (!granted) return
 
     val highQuality = remember { AppSettings.get(context).highAudioQuality }
-    val file = remember { store.newAudioFile(folder) }
+    // The recording is written straight into the document in the project folder.
+    val target = remember { runCatching { store.newAudio(folder).let { it to store.openFd(it, "rw") } }.getOrNull() }
+    val file = target?.first
+    val fd: ParcelFileDescriptor? = target?.second
     var paused by remember { mutableStateOf(false) }
     var elapsed by remember { mutableLongStateOf(0L) }
     var level by remember { mutableFloatStateOf(0f) }
@@ -93,12 +98,13 @@ fun AudioRecordDialog(store: PhotoStore, folder: File, onDone: () -> Unit) {
                     setAudioEncoder(MediaRecorder.AudioEncoder.AAC)
                     setAudioSamplingRate(if (highQuality) 48_000 else 44_100)
                     setAudioEncodingBitRate(if (highQuality) 192_000 else 96_000)
-                    setOutputFile(file.path)
+                    setOutputFile(fd!!.fileDescriptor)
                     prepare()
                     start()
                 }
         }.onFailure {
-            file.delete()
+            fd?.close()
+            file?.let { f -> AppScope.launch(Dispatchers.IO) { store.discard(f) } }
             Toast.makeText(context, context.getString(R.string.audio_start_failed, it.message), Toast.LENGTH_LONG).show()
         }.getOrNull()
     }
@@ -113,11 +119,13 @@ fun AudioRecordDialog(store: PhotoStore, folder: File, onDone: () -> Unit) {
         finished = true
         val ok = runCatching { recorder.stop() }.isSuccess
         recorder.release()
+        fd?.close()
+        val doc = file!!
         if (save && ok) {
-            store.mediaSaved(file)
+            AppScope.launch(Dispatchers.IO) { store.mediaSaved(doc) }
             Toast.makeText(context, R.string.audio_saved, Toast.LENGTH_SHORT).show()
         } else {
-            file.delete()
+            AppScope.launch(Dispatchers.IO) { store.discard(doc) }
             if (save) Toast.makeText(context, R.string.audio_too_short, Toast.LENGTH_SHORT).show()
         }
         onDone()
