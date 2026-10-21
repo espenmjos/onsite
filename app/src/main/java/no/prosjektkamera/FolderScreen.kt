@@ -78,7 +78,11 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
-import java.io.File
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import androidx.compose.runtime.produceState
+import androidx.compose.runtime.rememberCoroutineScope
 
 private sealed interface FolderDialog {
     data object Create : FolderDialog
@@ -92,31 +96,38 @@ private sealed interface FolderDialog {
 @Composable
 fun FolderScreen(
     store: PhotoStore,
-    folder: File,
-    onOpenFolder: (File) -> Unit,
+    folder: Doc,
+    onOpenFolder: (Doc) -> Unit,
     onUp: () -> Unit,
     onOpenCamera: () -> Unit,
-    onOpenPhoto: (File) -> Unit,
+    onOpenPhoto: (Doc) -> Unit,
     onOpenSettings: () -> Unit,
     onOpenTrash: () -> Unit,
 ) {
     val context = LocalContext.current
-    val isRoot = folder == store.root
+    val isRoot = folder.isRoot
     val version = store.version.intValue
     val settings = remember { AppSettings.get(context) }
-    val infos = remember(folder, version) { store.subfolders(folder).associateWith { store.folderInfo(it) } }
-    val subfolders = remember(infos, settings.sortByRecent) {
-        if (settings.sortByRecent) infos.keys.sortedByDescending { infos.getValue(it).lastActivity }
-        else infos.keys.toList()
+    val scope = rememberCoroutineScope()
+    // Storage calls go through the system's document provider, so load off the main thread.
+    val content by produceState<PhotoStore.FolderContent?>(null, folder, version, settings.sortByRecent) {
+        value = withContext(Dispatchers.IO) { store.loadFolder(folder, settings.sortByRecent) }
     }
-    val photos = remember(folder, version) { store.media(folder) }
-    val folderInfo = remember(folder, version) { if (isRoot) null else store.folderInfo(folder) }
+    val subfolders = content?.subfolders.orEmpty()
+    val infos = content?.infos.orEmpty()
+    val photos = content?.media.orEmpty()
+    val folderInfo = content?.info
+    val noted = content?.noted.orEmpty()
+    val folderNote = content?.note
     var recordingAudio by remember { mutableStateOf(false) }
-    var noteFor by remember { mutableStateOf<File?>(null) }
-    val noted = remember(folder, version) { store.notedFiles(folder) }
-    val folderNote = remember(folder, version) { if (isRoot) null else store.note(folder) }
+    var noteFor by remember { mutableStateOf<Doc?>(null) }
 
-    var selected by remember(folder) { mutableStateOf(setOf<File>()) }
+    /** Runs a storage operation in the background, then [after] on the main thread. */
+    fun <T> work(action: () -> T, after: (T) -> Unit = {}) = scope.launch {
+        after(withContext(Dispatchers.IO) { action() })
+    }
+
+    var selected by remember(folder) { mutableStateOf(setOf<Doc>()) }
     val selecting = selected.isNotEmpty()
     var dialog by remember { mutableStateOf<FolderDialog?>(null) }
     var menuOpen by remember { mutableStateOf(false) }
@@ -148,8 +159,8 @@ fun FolderScreen(
                                 if (isRoot) stringResource(R.string.projects) else folder.name,
                                 maxLines = 1, overflow = TextOverflow.Ellipsis
                             )
-                            val parent = folder.parentFile?.let { store.relativePath(it) }
-                            if (!isRoot && !parent.isNullOrEmpty()) {
+                            val parent = folder.parent.path
+                            if (!isRoot && parent.isNotEmpty()) {
                                 Text(
                                     parent.replace("/", " › "),
                                     style = MaterialTheme.typography.labelMedium,
@@ -166,9 +177,10 @@ fun FolderScreen(
                             Icon(Icons.Default.SelectAll, stringResource(R.string.select_all))
                         }
                         IconButton(onClick = {
-                            val files = store.mediaIn(selected)
-                            if (files.isEmpty()) toast(context.getString(R.string.nothing_to_share))
-                            else context.sharePhotos(files)
+                            work({ store.mediaIn(selected) }) { files ->
+                                if (files.isEmpty()) toast(context.getString(R.string.nothing_to_share))
+                                else context.shareDocs(store, files)
+                            }
                         }) {
                             Icon(Icons.Default.Share, stringResource(R.string.share))
                         }
@@ -201,7 +213,7 @@ fun FolderScreen(
                                     DropdownMenuItem(
                                         text = { Text(stringResource(R.string.share_all_here)) },
                                         enabled = photos.isNotEmpty(),
-                                        onClick = { menuOpen = false; context.sharePhotos(photos) })
+                                        onClick = { menuOpen = false; context.shareDocs(store, photos) })
                                     DropdownMenuItem(
                                         text = { Text(stringResource(R.string.rename)) },
                                         onClick = { menuOpen = false; dialog = FolderDialog.Rename })
@@ -233,7 +245,7 @@ fun FolderScreen(
             }
         },
     ) { padding ->
-        if (isRoot && subfolders.isEmpty()) {
+        if (content != null && isRoot && subfolders.isEmpty()) {
             Box(Modifier.fillMaxSize().padding(padding).padding(32.dp), contentAlignment = Alignment.Center) {
                 Text(
                     stringResource(R.string.empty_root),
@@ -262,7 +274,7 @@ fun FolderScreen(
             items(subfolders, key = { "d:" + it.path }, span = { GridItemSpan(maxLineSpan) }) { dir ->
                 val isSel = dir in selected
                 FolderRow(
-                    dir, infos.getValue(dir), selected = isSel,
+                    store, dir, infos.getValue(dir), selected = isSel,
                     onClick = {
                         if (selecting) selected = if (isSel) selected - dir else selected + dir
                         else onOpenFolder(dir)
@@ -270,7 +282,7 @@ fun FolderScreen(
                     onLongClick = { selected = selected + dir },
                 )
             }
-            if (!isRoot && subfolders.isEmpty() && photos.isEmpty()) {
+            if (content != null && !isRoot && subfolders.isEmpty() && photos.isEmpty()) {
                 item(key = "empty", span = { GridItemSpan(maxLineSpan) }) {
                     Text(
                         stringResource(R.string.empty_folder),
@@ -307,14 +319,14 @@ fun FolderScreen(
                                 modifier = Modifier.size(40.dp),
                             )
                             Text(
-                                formatWhen(context, photo.lastModified()),
+                                formatWhen(context, photo.lastModified),
                                 style = MaterialTheme.typography.labelSmall,
                                 color = MaterialTheme.colorScheme.onTertiaryContainer,
                             )
                         }
                     } else {
                         AsyncImage(
-                            model = photo,
+                            model = store.uri(photo),
                             contentDescription = photo.name,
                             contentScale = ContentScale.Crop,
                             modifier = Modifier.fillMaxSize().padding(if (isSel) 3.dp else 0.dp),
@@ -327,7 +339,7 @@ fun FolderScreen(
                         )
                     }
                     if (photo.isVideo || photo.isAudio) {
-                        val duration by rememberDuration(photo)
+                        val duration by rememberDuration(store, photo)
                         duration?.let {
                             Text(
                                 formatDuration(it),
@@ -369,9 +381,10 @@ fun FolderScreen(
             initial = "",
             onDismiss = { dialog = null },
             onConfirm = { name ->
-                store.createFolder(folder, name)
-                    .onSuccess { dialog = null; onOpenFolder(it) }
-                    .onFailure { toast(it.message ?: context.getString(R.string.error)) }
+                work({ store.createFolder(folder, name) }) { r ->
+                    r.onSuccess { dialog = null; onOpenFolder(it) }
+                        .onFailure { toast(it.message ?: context.getString(R.string.error)) }
+                }
             },
         )
         FolderDialog.Rename -> NameDialog(
@@ -379,26 +392,27 @@ fun FolderScreen(
             initial = folder.name,
             onDismiss = { dialog = null },
             onConfirm = { name ->
-                store.renameFolder(folder, name)
-                    .onSuccess { dialog = null; onOpenFolder(it) }
-                    .onFailure { toast(it.message ?: context.getString(R.string.error)) }
+                work({ store.renameFolder(folder, name) }) { r ->
+                    r.onSuccess { dialog = null; onOpenFolder(it) }
+                        .onFailure { toast(it.message ?: context.getString(R.string.error)) }
+                }
             },
         )
         FolderDialog.DeleteFolder -> {
-            val n = store.countMediaRecursive(folder)
+            val n = folderInfo?.total ?: 0
             ConfirmDialog(
                 title = stringResource(R.string.delete_folder_q, folder.name),
                 text = pluralStringResource(R.plurals.delete_folder_body, n, n),
                 onDismiss = { dialog = null },
                 onConfirm = {
-                    dialog = null; onUp(); store.deleteFolder(folder)
-                    toast(context.getString(R.string.moved_to_trash))
+                    dialog = null; onUp()
+                    work({ store.deleteFolder(folder) }) { toast(context.getString(R.string.moved_to_trash)) }
                 },
             )
         }
         FolderDialog.DeletePhotos -> {
             val hasFolders = selected.any { it.isDirectory }
-            val n = remember(selected) { store.mediaIn(selected).size }
+            val n by produceState(0, selected) { value = withContext(Dispatchers.IO) { store.mediaIn(selected).size } }
             ConfirmDialog(
                 title = if (hasFolders) stringResource(R.string.delete_selected_q)
                 else pluralStringResource(R.plurals.delete_n_files_q, selected.size, selected.size),
@@ -406,8 +420,9 @@ fun FolderScreen(
                 else stringResource(R.string.files_deleted_permanently),
                 onDismiss = { dialog = null },
                 onConfirm = {
-                    store.deleteItems(selected); selected = emptySet(); dialog = null
-                    toast(context.getString(R.string.moved_to_trash))
+                    val items = selected
+                    selected = emptySet(); dialog = null
+                    work({ store.deleteItems(items) }) { toast(context.getString(R.string.moved_to_trash)) }
                 },
             )
         }
@@ -418,10 +433,10 @@ fun FolderScreen(
             allowRoot = selected.all { it.isDirectory },
             onDismiss = { dialog = null },
             onPick = { dest ->
-                store.moveItems(selected, dest)
+                val items = selected
                 selected = emptySet(); dialog = null
-                val name = if (dest == store.root) context.getString(R.string.projects) else dest.name
-                toast(context.getString(R.string.moved_to, name))
+                val name = if (dest.isRoot) context.getString(R.string.projects) else dest.name
+                work({ store.moveItems(items, dest) }) { toast(context.getString(R.string.moved_to, name)) }
             },
         )
         null -> {}
@@ -466,7 +481,8 @@ private fun FolderHeader(info: PhotoStore.FolderInfo, note: String?, onEditNote:
 @OptIn(ExperimentalFoundationApi::class)
 @Composable
 private fun FolderRow(
-    dir: File,
+    store: PhotoStore,
+    dir: Doc,
     info: PhotoStore.FolderInfo,
     selected: Boolean,
     onClick: () -> Unit,
@@ -484,7 +500,7 @@ private fun FolderRow(
             ) {
                 if (info.cover != null) {
                     AsyncImage(
-                        model = info.cover, contentDescription = null,
+                        model = store.uri(info.cover), contentDescription = null,
                         contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize(),
                     )
                 } else {

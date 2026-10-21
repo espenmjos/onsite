@@ -54,7 +54,7 @@ import androidx.compose.ui.unit.dp
 import androidx.exifinterface.media.ExifInterface
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
-import java.io.File
+import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
 import java.util.Locale
 
@@ -69,13 +69,14 @@ private data class MediaDetails(
     val lon: Double?,
 )
 
-private fun readDetails(file: File): MediaDetails = runCatching {
-    if (file.isPhoto) {
-        val exif = ExifInterface(file)
+private fun readDetails(context: Context, uri: Uri, doc: Doc): MediaDetails = runCatching {
+    val resolver = context.contentResolver
+    if (doc.isPhoto) {
+        val exif = resolver.openInputStream(uri)!!.use { ExifInterface(it) }
         val taken = (exif.getAttribute(ExifInterface.TAG_DATETIME_ORIGINAL) ?: exif.getAttribute(ExifInterface.TAG_DATETIME))
             ?.let { runCatching { SimpleDateFormat("yyyy:MM:dd HH:mm:ss", Locale.ROOT).parse(it)?.time }.getOrNull() }
         val bounds = BitmapFactory.Options().apply { inJustDecodeBounds = true }
-            .also { BitmapFactory.decodeFile(file.path, it) }
+            .also { opts -> resolver.openInputStream(uri)?.use { BitmapFactory.decodeStream(it, null, opts) } }
         val swap = exif.rotationDegrees == 90 || exif.rotationDegrees == 270
         val camera = listOfNotNull(exif.getAttribute(ExifInterface.TAG_MAKE), exif.getAttribute(ExifInterface.TAG_MODEL))
             .distinct().joinToString(" ").ifBlank { null }
@@ -87,7 +88,7 @@ private fun readDetails(file: File): MediaDetails = runCatching {
     } else {
         val r = MediaMetadataRetriever()
         try {
-            r.setDataSource(file.path)
+            r.setDataSource(context, uri)
             fun key(k: Int) = r.extractMetadata(k)
             val rot = key(MediaMetadataRetriever.METADATA_KEY_VIDEO_ROTATION)?.toIntOrNull() ?: 0
             val w = key(MediaMetadataRetriever.METADATA_KEY_VIDEO_WIDTH)?.toIntOrNull()
@@ -122,15 +123,19 @@ private suspend fun lookUpAddress(context: Context, lat: Double, lon: Double): S
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
-fun DetailsSheet(store: PhotoStore, file: File, onDismiss: () -> Unit) {
+fun DetailsSheet(store: PhotoStore, file: Doc, onDismiss: () -> Unit) {
     val context = LocalContext.current
-    val details by produceState<MediaDetails?>(null, file) { value = withContext(Dispatchers.IO) { readDetails(file) } }
+    val details by produceState<MediaDetails?>(null, file) {
+        value = withContext(Dispatchers.IO) { readDetails(context, store.uri(file), file) }
+    }
     val d = details
     val address by produceState<String?>(null, d?.lat, d?.lon) {
         if (d?.lat != null && d.lon != null) value = lookUpAddress(context, d.lat, d.lon)
     }
     val version = store.version.intValue
-    val custom = remember(file, version) { store.customAddress(file) }
+    val custom by produceState<String?>(null, file, version) {
+        value = withContext(Dispatchers.IO) { store.customAddress(file) }
+    }
     var editing by remember { mutableStateOf(false) }
     val hasGps = d?.lat != null && d.lon != null
 
@@ -143,7 +148,7 @@ fun DetailsSheet(store: PhotoStore, file: File, onDismiss: () -> Unit) {
             if (d == null) return@Column
 
             DetailRow(Icons.Default.CalendarMonth, stringResource(R.string.taken),
-                formatDateTime(context, d.taken ?: file.lastModified()))
+                formatDateTime(context, d.taken ?: file.lastModified))
 
             val coords = if (hasGps) String.format(Locale.ROOT, "%.5f, %.5f", d.lat, d.lon) else null
             DetailRow(
@@ -178,9 +183,9 @@ fun DetailsSheet(store: PhotoStore, file: File, onDismiss: () -> Unit) {
             }
 
             DetailRow(Icons.Default.Folder, stringResource(R.string.folder),
-                store.relativePath(file.parentFile!!).replace("/", " › "))
+                file.parent.path.replace("/", " › "))
             DetailRow(Icons.Default.InsertDriveFile, stringResource(R.string.file),
-                file.name + "\n" + formatSize(file.length()))
+                file.name + "\n" + formatSize(file.length))
             if (d.width != null && d.height != null && d.width > 0) {
                 DetailRow(Icons.Default.PhotoSizeSelectLarge, stringResource(R.string.resolution),
                     String.format(Locale.ROOT, "%d × %d  (%.1f MP)", d.width, d.height, d.width * d.height / 1e6))
@@ -195,7 +200,10 @@ fun DetailsSheet(store: PhotoStore, file: File, onDismiss: () -> Unit) {
             initial = custom ?: address.orEmpty(),
             canReset = custom != null && hasGps,
             onDismiss = { editing = false },
-            onSave = { store.setCustomAddress(file, it); editing = false },
+            onSave = { text ->
+                editing = false
+                AppScope.launch(Dispatchers.IO) { store.setCustomAddress(file, text) }
+            },
         )
     }
 }

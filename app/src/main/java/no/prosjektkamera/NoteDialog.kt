@@ -23,18 +23,26 @@ import androidx.compose.ui.text.input.KeyboardCapitalization
 import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.ui.unit.dp
-import java.io.File
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import androidx.compose.runtime.rememberCoroutineScope
 
 /** Edits the note for a file or folder. Saving an empty note removes it. */
 @Composable
-fun NoteDialog(store: PhotoStore, item: File, onDismiss: () -> Unit) {
-    val initial = remember(item) { store.note(item).orEmpty() }
-    var text by remember { mutableStateOf(TextFieldValue(initial, TextRange(initial.length))) }
+fun NoteDialog(store: PhotoStore, item: Doc, onDismiss: () -> Unit) {
+    var initial by remember { mutableStateOf<String?>(null) }
+    var text by remember { mutableStateOf(TextFieldValue("")) }
+    LaunchedEffect(item) {
+        val note = withContext(Dispatchers.IO) { store.note(item).orEmpty() }
+        initial = note
+        text = TextFieldValue(note, TextRange(note.length))
+    }
     val focus = remember { FocusRequester() }
     LaunchedEffect(Unit) { focus.requestFocus() }
     AlertDialog(
         onDismissRequest = onDismiss,
-        title = { Text(stringResource(if (initial.isEmpty()) R.string.add_note else R.string.edit_note)) },
+        title = { Text(stringResource(if (initial.isNullOrEmpty()) R.string.add_note else R.string.edit_note)) },
         text = {
             Column {
                 OutlinedTextField(
@@ -55,7 +63,12 @@ fun NoteDialog(store: PhotoStore, item: File, onDismiss: () -> Unit) {
             }
         },
         confirmButton = {
-            TextButton(onClick = { store.setNote(item, text.text); onDismiss() }) {
+            TextButton(onClick = {
+                val value = text.text
+                // AppScope so the save finishes even though the dialog closes right away.
+                AppScope.launch(Dispatchers.IO) { store.setNote(item, value) }
+                onDismiss()
+            }) {
                 Text(stringResource(R.string.save))
             }
         },

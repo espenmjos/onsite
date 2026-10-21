@@ -70,16 +70,28 @@ import androidx.media3.ui.PlayerView
 import android.net.Uri
 import android.view.View
 import coil.compose.AsyncImage
-import java.io.File
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import androidx.compose.runtime.produceState
+import androidx.compose.runtime.rememberCoroutineScope
 import java.text.SimpleDateFormat
 import java.util.Date
 import java.util.Locale
 
 @Composable
-fun ViewerScreen(store: PhotoStore, folder: File, initial: File, onClose: () -> Unit) {
+fun ViewerScreen(store: PhotoStore, folder: Doc, initial: Doc, onClose: () -> Unit) {
     val context = LocalContext.current
+    val scope = rememberCoroutineScope()
     val version = store.version.intValue
-    val photos = remember(folder, version) { store.media(folder) }
+    val loaded by produceState<List<Doc>?>(null, folder, version) {
+        value = withContext(Dispatchers.IO) { store.media(folder) }
+    }
+    val photos = loaded
+    if (photos == null) {
+        Box(Modifier.fillMaxSize().background(Color.Black))
+        return
+    }
     if (photos.isEmpty()) {
         LaunchedEffect(Unit) { onClose() }
         return
@@ -90,7 +102,9 @@ fun ViewerScreen(store: PhotoStore, folder: File, initial: File, onClose: () -> 
     var moving by remember { mutableStateOf(false) }
     var editingNote by remember { mutableStateOf(false) }
     var showDetails by remember { mutableStateOf(false) }
-    val note = remember(current, version) { store.note(current) }
+    val note by produceState<String?>(null, current, version) {
+        value = withContext(Dispatchers.IO) { store.note(current) }
+    }
     // Tapping a photo hides/shows the bars, like the system gallery.
     var chrome by remember { mutableStateOf(true) }
 
@@ -98,9 +112,9 @@ fun ViewerScreen(store: PhotoStore, folder: File, initial: File, onClose: () -> 
         HorizontalPager(state = pager, modifier = Modifier.fillMaxSize(), key = { photos[it].path }) { page ->
             val file = photos[page]
             when {
-                file.isVideo -> VideoPage(file, isCurrent = page == pager.currentPage)
-                file.isAudio -> AudioPage(file, isCurrent = page == pager.currentPage)
-                else -> ZoomableImage(file, onTap = { chrome = !chrome })
+                file.isVideo -> VideoPage(store.uri(file), isCurrent = page == pager.currentPage)
+                file.isAudio -> AudioPage(store.uri(file), file.name, isCurrent = page == pager.currentPage)
+                else -> ZoomableImage(store.uri(file), file.name, onTap = { chrome = !chrome })
             }
         }
 
@@ -118,14 +132,13 @@ fun ViewerScreen(store: PhotoStore, folder: File, initial: File, onClose: () -> 
                 IconButton(onClick = { showDetails = true }, modifier = Modifier.align(Alignment.CenterEnd)) {
                     Icon(Icons.Outlined.Info, stringResource(R.string.details), tint = Color.White)
                 }
-                val date = Date(current.lastModified())
                 Column(Modifier.align(Alignment.Center), horizontalAlignment = Alignment.CenterHorizontally) {
                     Text(
-                        formatDate(context, current.lastModified()),
+                        formatDate(context, current.lastModified),
                         color = Color.White, style = MaterialTheme.typography.titleMedium,
                     )
                     Text(
-                        formatTime(context, current.lastModified()) + "  ·  " +
+                        formatTime(context, current.lastModified) + "  ·  " +
                             stringResource(R.string.position, pager.currentPage + 1, photos.size),
                         color = Color.White.copy(alpha = 0.8f), style = MaterialTheme.typography.bodySmall,
                     )
@@ -162,7 +175,7 @@ fun ViewerScreen(store: PhotoStore, folder: File, initial: File, onClose: () -> 
                     .padding(vertical = 6.dp),
                 horizontalArrangement = Arrangement.SpaceEvenly,
             ) {
-                BottomAction(Icons.Default.Share, stringResource(R.string.share)) { context.sharePhotos(listOf(current)) }
+                BottomAction(Icons.Default.Share, stringResource(R.string.share)) { context.shareDocs(store, listOf(current)) }
                 BottomAction(Icons.Default.EditNote, stringResource(R.string.note)) { editingNote = true }
                 BottomAction(Icons.AutoMirrored.Filled.DriveFileMove, stringResource(R.string.move_to)) { moving = true }
                 BottomAction(Icons.Default.Delete, stringResource(R.string.delete)) { confirmDelete = true }
@@ -180,8 +193,11 @@ fun ViewerScreen(store: PhotoStore, folder: File, initial: File, onClose: () -> 
             onDismiss = { moving = false },
             onPick = { dest ->
                 moving = false
-                store.moveItems(listOf(current), dest)
-                Toast.makeText(context, context.getString(R.string.moved_to, dest.name), Toast.LENGTH_SHORT).show()
+                val item = current
+                scope.launch {
+                    withContext(Dispatchers.IO) { store.moveItems(listOf(item), dest) }
+                    Toast.makeText(context, context.getString(R.string.moved_to, dest.name), Toast.LENGTH_SHORT).show()
+                }
             },
         )
     }
@@ -197,8 +213,11 @@ fun ViewerScreen(store: PhotoStore, folder: File, initial: File, onClose: () -> 
             onDismiss = { confirmDelete = false },
             onConfirm = {
                 confirmDelete = false
-                store.deleteItems(listOf(current))
-                Toast.makeText(context, R.string.moved_to_trash, Toast.LENGTH_SHORT).show()
+                val item = current
+                scope.launch {
+                    withContext(Dispatchers.IO) { store.deleteItems(listOf(item)) }
+                    Toast.makeText(context, R.string.moved_to_trash, Toast.LENGTH_SHORT).show()
+                }
             },
         )
     }
@@ -217,7 +236,7 @@ private fun BottomAction(icon: ImageVector, label: String, onClick: () -> Unit) 
 }
 
 @Composable
-private fun ZoomableImage(file: File, onTap: () -> Unit) {
+private fun ZoomableImage(uri: Uri, name: String, onTap: () -> Unit) {
     var scale by remember { mutableFloatStateOf(1f) }
     var offset by remember { mutableStateOf(Offset.Zero) }
     Box(
@@ -244,8 +263,8 @@ private fun ZoomableImage(file: File, onTap: () -> Unit) {
             },
     ) {
         AsyncImage(
-            model = file,
-            contentDescription = file.name,
+            model = uri,
+            contentDescription = name,
             contentScale = ContentScale.Fit,
             modifier = Modifier.fillMaxSize().graphicsLayer {
                 scaleX = scale; scaleY = scale
@@ -256,11 +275,11 @@ private fun ZoomableImage(file: File, onTap: () -> Unit) {
 }
 
 @Composable
-private fun rememberPlayer(file: File, isCurrent: Boolean, autoPlay: Boolean): ExoPlayer {
+private fun rememberPlayer(uri: Uri, isCurrent: Boolean, autoPlay: Boolean): ExoPlayer {
     val context = LocalContext.current
-    val player = remember(file) {
+    val player = remember(uri) {
         ExoPlayer.Builder(context).build().apply {
-            setMediaItem(MediaItem.fromUri(Uri.fromFile(file)))
+            setMediaItem(MediaItem.fromUri(uri))
             prepare()
         }
     }
@@ -271,8 +290,8 @@ private fun rememberPlayer(file: File, isCurrent: Boolean, autoPlay: Boolean): E
 }
 
 @Composable
-private fun AudioPage(file: File, isCurrent: Boolean) {
-    val player = rememberPlayer(file, isCurrent, autoPlay = false)
+private fun AudioPage(uri: Uri, name: String, isCurrent: Boolean) {
+    val player = rememberPlayer(uri, isCurrent, autoPlay = false)
     Column(
         Modifier.fillMaxSize().safeDrawingPadding().padding(top = 56.dp, bottom = 64.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
@@ -281,7 +300,7 @@ private fun AudioPage(file: File, isCurrent: Boolean) {
         Icon(Icons.Default.GraphicEq, null, tint = Color.White, modifier = Modifier.size(120.dp))
         Text(stringResource(R.string.voice_note), color = Color.White, style = MaterialTheme.typography.titleLarge)
         Text(
-            file.name, color = Color.White.copy(alpha = 0.6f),
+            name, color = Color.White.copy(alpha = 0.6f),
             style = MaterialTheme.typography.bodySmall,
         )
         Spacer(Modifier.weight(1f))
@@ -304,8 +323,8 @@ private fun AudioPage(file: File, isCurrent: Boolean) {
 }
 
 @Composable
-private fun VideoPage(file: File, isCurrent: Boolean) {
-    val player = rememberPlayer(file, isCurrent, autoPlay = true)
+private fun VideoPage(uri: Uri, isCurrent: Boolean) {
+    val player = rememberPlayer(uri, isCurrent, autoPlay = true)
     AndroidView(
         // Keep the player's controls clear of the status bar/top bar and the system navigation bar.
         modifier = Modifier.fillMaxSize().safeDrawingPadding().padding(top = 56.dp, bottom = 64.dp),

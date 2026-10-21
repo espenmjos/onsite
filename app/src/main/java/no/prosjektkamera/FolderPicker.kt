@@ -41,7 +41,11 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import java.io.File
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import androidx.compose.runtime.produceState
+import androidx.compose.runtime.rememberCoroutineScope
 
 /**
  * Browse-style folder picker: tap a folder to go into it, arrow to go up,
@@ -51,31 +55,43 @@ import java.io.File
 @Composable
 fun MoveDialog(
     store: PhotoStore,
-    exclude: File,
+    exclude: Doc,
     onDismiss: () -> Unit,
     /** Folders being moved: they can't be entered, since a folder can't go inside itself. */
-    blocked: Set<File> = emptySet(),
+    blocked: Set<Doc> = emptySet(),
     /** Folders may be moved to the top level (becoming projects); files may not. */
     allowRoot: Boolean = false,
     title: String = stringResource(R.string.move_to),
     confirmLabel: String = stringResource(R.string.move_here),
     /** Where browsing starts; defaults to next to [exclude]. */
-    start: File? = null,
+    start: Doc? = null,
     /** Optional extra controls shown under the folder list (e.g. copy vs. move). */
     extra: (@Composable () -> Unit)? = null,
-    onPick: (File) -> Unit,
+    onPick: (Doc) -> Unit,
 ) {
     val context = LocalContext.current
     var current by remember {
         mutableStateOf(
-            start?.takeIf { it.isDirectory && it.startsWith(store.root) }
-                ?: exclude.parentFile?.takeIf { it.startsWith(store.root) } ?: store.root
+            start ?: if (exclude.isRoot) store.root else exclude.parent
         )
     }
     var creating by remember { mutableStateOf(false) }
     val version = store.version.intValue
-    val children = remember(current, version) { store.subfolders(current) }
-    val isRoot = current == store.root
+    val scope = rememberCoroutineScope()
+    /** Subfolders of the current folder, with whether each has subfolders and how many files. */
+    val listing by produceState<List<Triple<Doc, Boolean, Int>>?>(null, current, version) {
+        value = withContext(Dispatchers.IO) {
+            val subs = store.subfolders(current)
+            // A start folder that no longer exists: fall back to the top level.
+            if (subs.isEmpty() && !current.isRoot && !store.exists(current)) {
+                current = store.root
+                return@withContext null
+            }
+            subs.map { Triple(it, store.subfolders(it).isNotEmpty(), store.media(it).size) }
+        }
+    }
+    val children = listing.orEmpty()
+    val isRoot = current.isRoot
     val isSource = current == exclude
 
     AlertDialog(
@@ -85,7 +101,7 @@ fun MoveDialog(
             Column {
                 // Location bar: up arrow + breadcrumb
                 Row(verticalAlignment = Alignment.CenterVertically) {
-                    IconButton(enabled = !isRoot, onClick = { current = current.parentFile!! }) {
+                    IconButton(enabled = !isRoot, onClick = { current = current.parent }) {
                         Icon(
                             if (isRoot) Icons.Default.Home else Icons.AutoMirrored.Filled.ArrowBack,
                             stringResource(R.string.up),
@@ -93,14 +109,14 @@ fun MoveDialog(
                     }
                     Text(
                         if (isRoot) stringResource(R.string.projects)
-                        else stringResource(R.string.projects) + " › " + store.relativePath(current).replace("/", " › "),
+                        else stringResource(R.string.projects) + " › " + current.path.replace("/", " › "),
                         style = MaterialTheme.typography.titleSmall,
                         maxLines = 2, overflow = TextOverflow.Ellipsis,
                     )
                 }
                 HorizontalDivider()
                 Box(Modifier.height(320.dp)) {
-                    if (children.isEmpty()) {
+                    if (listing != null && children.isEmpty()) {
                         Text(
                             stringResource(R.string.no_subfolders),
                             color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -109,9 +125,7 @@ fun MoveDialog(
                         )
                     }
                     LazyColumn {
-                        items(children, key = { it.path }) { dir ->
-                            val hasChildren = remember(dir, version) { store.subfolders(dir).isNotEmpty() }
-                            val count = remember(dir, version) { store.media(dir).size }
+                        items(children, key = { it.first.path }) { (dir, hasChildren, count) ->
                             val isBlocked = dir in blocked
                             ListItem(
                                 modifier = Modifier.clickable(enabled = !isBlocked) { current = dir }
@@ -154,9 +168,11 @@ fun MoveDialog(
             initial = "",
             onDismiss = { creating = false },
             onConfirm = { name ->
-                store.createFolder(current, name)
-                    .onSuccess { creating = false; current = it }
-                    .onFailure { Toast.makeText(context, it.message ?: context.getString(R.string.error), Toast.LENGTH_SHORT).show() }
+                scope.launch {
+                    withContext(Dispatchers.IO) { store.createFolder(current, name) }
+                        .onSuccess { creating = false; current = it }
+                        .onFailure { Toast.makeText(context, it.message ?: context.getString(R.string.error), Toast.LENGTH_SHORT).show() }
+                }
             },
         )
     }

@@ -1,13 +1,13 @@
 package no.prosjektkamera
 
-import android.Manifest
+import android.content.ClipData
 import android.content.Context
+import android.widget.Toast
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import android.content.Intent
-import android.net.Uri
-import android.os.Build
 import android.os.Bundle
 import android.view.KeyEvent
-import android.provider.Settings
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -34,17 +34,14 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
-import androidx.lifecycle.compose.LifecycleResumeEffect
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
-import androidx.core.content.FileProvider
 import coil.Coil
 import coil.ImageLoader
 import coil.decode.VideoFrameDecoder
-import java.io.File
 
 class MainActivity : ComponentActivity() {
     override fun onKeyDown(keyCode: Int, event: KeyEvent): Boolean {
@@ -66,16 +63,11 @@ class MainActivity : ComponentActivity() {
 
         setContent {
             MaterialTheme(colorScheme = if (isSystemInDarkTheme()) OnsiteDark else OnsiteLight) {
-                var access by remember { mutableStateOf(hasStorageAccess(this)) }
-                LifecycleResumeEffect(Unit) {
-                    access = hasStorageAccess(this@MainActivity)
-                    onPauseOrDispose {}
-                }
-                LaunchedEffect(access) { if (access) store.init() }
-                if (!access) {
-                    StorageAccessScreen()
+                if (store.treeUri == null) {
+                    StorageAccessScreen(store)
                     return@MaterialTheme
                 }
+                LaunchedEffect(Unit) { withContext(Dispatchers.IO) { store.onStart() } }
 
                 // Navigation is a small hand-rolled back stack: current folder
                 // (relative path) plus an optional overlay screen.
@@ -85,7 +77,7 @@ class MainActivity : ComponentActivity() {
                 var settings by rememberSaveable { mutableStateOf(false) }
                 var trash by rememberSaveable { mutableStateOf(false) }
 
-                val folder = File(store.root, folderPath).takeIf { it.isDirectory } ?: store.root
+                val folder = Doc(folderPath, true)
 
                 when {
                     trash -> {
@@ -110,19 +102,19 @@ class MainActivity : ComponentActivity() {
                         ViewerScreen(
                             store = store,
                             folder = folder,
-                            initial = File(viewerPhoto!!),
+                            initial = Doc(viewerPhoto!!, false),
                             onClose = { viewerPhoto = null },
                         )
                     }
                     else -> {
-                        if (folder != store.root) {
-                            BackHandler { folderPath = store.relativePath(folder.parentFile!!) }
+                        if (!folder.isRoot) {
+                            BackHandler { folderPath = folder.parent.path }
                         }
                         FolderScreen(
                             store = store,
                             folder = folder,
-                            onOpenFolder = { folderPath = store.relativePath(it) },
-                            onUp = { folderPath = store.relativePath(folder.parentFile!!) },
+                            onOpenFolder = { folderPath = it.path },
+                            onUp = { folderPath = folder.parent.path },
                             onOpenCamera = { camera = true },
                             onOpenPhoto = { viewerPhoto = it.path },
                             onOpenSettings = { settings = true },
@@ -135,10 +127,18 @@ class MainActivity : ComponentActivity() {
     }
 }
 
+/**
+ * First run (or after access was lost): the user picks the storage folder once,
+ * normally Pictures/Onsite, and Onsite keeps access to just that folder.
+ */
 @Composable
-fun StorageAccessScreen() {
+fun StorageAccessScreen(store: PhotoStore) {
     val context = LocalContext.current
-    val legacyLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) {}
+    val picker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocumentTree()) { uri ->
+        if (uri != null && !store.adoptTree(uri)) {
+            Toast.makeText(context, R.string.folder_not_supported, Toast.LENGTH_LONG).show()
+        }
+    }
     Surface(Modifier.fillMaxSize()) {
         Column(
             Modifier.fillMaxSize().safeDrawingPadding().padding(32.dp),
@@ -147,34 +147,26 @@ fun StorageAccessScreen() {
         ) {
             Text(stringResource(R.string.storage_access_title), style = MaterialTheme.typography.headlineSmall)
             Spacer(Modifier.height(16.dp))
-            Text(
-                stringResource(R.string.storage_access_body),
-                textAlign = TextAlign.Center,
-            )
+            Text(stringResource(R.string.storage_access_body), textAlign = TextAlign.Center)
             Spacer(Modifier.height(24.dp))
-            Button(onClick = {
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
-                    context.startActivity(
-                        Intent(
-                            Settings.ACTION_MANAGE_APP_ALL_FILES_ACCESS_PERMISSION,
-                            Uri.parse("package:${context.packageName}"),
-                        )
-                    )
-                } else {
-                    legacyLauncher.launch(Manifest.permission.WRITE_EXTERNAL_STORAGE)
-                }
-            }) { Text(stringResource(R.string.grant_access)) }
+            Button(onClick = { picker.launch(PhotoStore.suggestedStartUri()) }) {
+                Text(stringResource(R.string.choose_folder))
+            }
         }
     }
 }
 
-fun Context.sharePhotos(files: List<File>) {
-    if (files.isEmpty()) return
-    val uris = files.map { FileProvider.getUriForFile(this, "$packageName.files", it) }
+/** Shares documents with other apps; works for one or many, with read access granted to the receiver. */
+fun Context.shareDocs(store: PhotoStore, docs: List<Doc>) {
+    if (docs.isEmpty()) return
+    val uris = docs.map { store.uri(it) }
     val intent = if (uris.size == 1) {
         Intent(Intent.ACTION_SEND).putExtra(Intent.EXTRA_STREAM, uris[0])
     } else {
         Intent(Intent.ACTION_SEND_MULTIPLE).putParcelableArrayListExtra(Intent.EXTRA_STREAM, ArrayList(uris))
-    }.setType(files.map { it.mimeType }.distinct().singleOrNull() ?: "*/*").addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+    }.setType(docs.map { it.mimeType }.distinct().singleOrNull() ?: "*/*")
+        .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+    // ClipData makes the read grant cover every shared item, not just the first.
+    intent.clipData = ClipData.newRawUri(null, uris[0]).apply { uris.drop(1).forEach { addItem(ClipData.Item(it)) } }
     startActivity(Intent.createChooser(intent, getString(R.string.share)))
 }

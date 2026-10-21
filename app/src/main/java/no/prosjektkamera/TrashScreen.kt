@@ -47,6 +47,11 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import coil.compose.AsyncImage
 import kotlin.math.ceil
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
+import androidx.compose.runtime.produceState
+import androidx.compose.runtime.rememberCoroutineScope
 import kotlin.math.max
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -54,7 +59,10 @@ import kotlin.math.max
 fun TrashScreen(store: PhotoStore, onClose: () -> Unit) {
     val context = LocalContext.current
     val version = store.version.intValue
-    val entries = remember(version) { store.trashEntries() }
+    val scope = rememberCoroutineScope()
+    val entries by produceState(emptyList<PhotoStore.TrashEntry>(), version) {
+        value = withContext(Dispatchers.IO) { store.trashEntries() }
+    }
     var selected by remember { mutableStateOf(setOf<PhotoStore.TrashEntry>()) }
     // Drop selections that no longer exist after a restore/delete.
     val sel = selected.filter { it in entries }.toSet()
@@ -83,7 +91,8 @@ fun TrashScreen(store: PhotoStore, onClose: () -> Unit) {
                 actions = {
                     if (sel.isNotEmpty()) {
                         IconButton(onClick = {
-                            store.restore(sel)
+                            val items = sel
+                            scope.launch(Dispatchers.IO) { store.restore(items) }
                             Toast.makeText(
                                 context,
                                 context.resources.getQuantityString(R.plurals.restored_n, sel.size, sel.size),
@@ -142,7 +151,7 @@ fun TrashScreen(store: PhotoStore, onClose: () -> Unit) {
                                 e.item.isDirectory -> Icon(Icons.Default.Folder, null, tint = MaterialTheme.colorScheme.secondary)
                                 e.item.isAudio -> Icon(Icons.Default.GraphicEq, null)
                                 else -> AsyncImage(
-                                    model = e.item, contentDescription = null,
+                                    model = store.uri(e.item), contentDescription = null,
                                     contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize(),
                                 )
                             }
@@ -177,7 +186,7 @@ fun TrashScreen(store: PhotoStore, onClose: () -> Unit) {
             text = { Text(stringResource(R.string.cannot_undo)) },
             confirmButton = {
                 TextButton(onClick = {
-                    store.deleteForever(targets)
+                    scope.launch(Dispatchers.IO) { store.deleteForever(targets) }
                     selected = emptySet()
                     confirm = null
                 }) { Text(stringResource(R.string.delete_forever), color = MaterialTheme.colorScheme.error) }
