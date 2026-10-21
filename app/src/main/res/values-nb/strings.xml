@@ -214,4 +214,9 @@
     <string name="choose_folder">Velg mappe</string>
     <string name="change_folder">Bytt mappe</string>
     <string name="folder_not_supported">Velg en mappe på telefonens egen lagring</string>
+    <string name="section_appearance">Utseende</string>
+    <string name="theme">Tema</string>
+    <string name="theme_system">System</string>
+    <string name="theme_light">Lys</string>
+    <string name="theme_dark">Mørk</string>
 </resources>

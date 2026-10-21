@@ -65,10 +65,10 @@ class ShareReceiverActivity : ComponentActivity() {
         val settings = AppSettings.get(this)
 
         setContent {
-            MaterialTheme(colorScheme = if (isSystemInDarkTheme()) OnsiteDark else OnsiteLight) {
+            OnsiteTheme {
                 if (store.treeUri == null) {
                     StorageAccessScreen(store)
-                    return@MaterialTheme
+                    return@OnsiteTheme
                 }
                 var saving by remember { mutableStateOf(false) }
                 if (saving) {
@@ -82,7 +82,7 @@ class ShareReceiverActivity : ComponentActivity() {
                             }
                         },
                     )
-                    return@MaterialTheme
+                    return@OnsiteTheme
                 }
                 MoveDialog(
                     store = store,

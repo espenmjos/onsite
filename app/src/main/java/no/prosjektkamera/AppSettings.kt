@@ -14,6 +14,9 @@ import kotlin.reflect.KProperty
 class AppSettings private constructor(context: Context) {
     private val p = context.getSharedPreferences("settings", Context.MODE_PRIVATE)
 
+    // Appearance: "system", "light" or "dark"
+    var theme by pref("theme", "system")
+
     // Projects
     var sortByRecent by pref("sortByRecent", false)
 

@@ -62,10 +62,10 @@ class MainActivity : ComponentActivity() {
         )
 
         setContent {
-            MaterialTheme(colorScheme = if (isSystemInDarkTheme()) OnsiteDark else OnsiteLight) {
+            OnsiteTheme {
                 if (store.treeUri == null) {
                     StorageAccessScreen(store)
-                    return@MaterialTheme
+                    return@OnsiteTheme
                 }
                 LaunchedEffect(Unit) { withContext(Dispatchers.IO) { store.onStart() } }
 

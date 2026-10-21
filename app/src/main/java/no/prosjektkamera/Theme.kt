@@ -1,5 +1,14 @@
 package no.prosjektkamera
 
+import androidx.activity.ComponentActivity
+import androidx.activity.SystemBarStyle
+import androidx.activity.enableEdgeToEdge
+import androidx.compose.foundation.isSystemInDarkTheme
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.remember
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.material3.darkColorScheme
 import androidx.compose.material3.lightColorScheme
 import androidx.compose.ui.graphics.Color
@@ -59,3 +68,24 @@ val OnsiteDark = darkColorScheme(
     surfaceContainerHighest = Color(0xFF26394C),
     outline = Color(0xFF5E7084),
 )
+
+/**
+ * Onsite's theme, following the user's choice in settings (system, light or dark).
+ * Also keeps the status/navigation bar icons readable for the chosen mode.
+ */
+@Composable
+fun OnsiteTheme(content: @Composable () -> Unit) {
+    val context = LocalContext.current
+    val settings = remember { AppSettings.get(context) }
+    val dark = when (settings.theme) {
+        "light" -> false
+        "dark" -> true
+        else -> isSystemInDarkTheme()
+    }
+    LaunchedEffect(dark) {
+        val transparent = android.graphics.Color.TRANSPARENT
+        val style = if (dark) SystemBarStyle.dark(transparent) else SystemBarStyle.light(transparent, transparent)
+        (context as? ComponentActivity)?.enableEdgeToEdge(statusBarStyle = style, navigationBarStyle = style)
+    }
+    MaterialTheme(colorScheme = if (dark) OnsiteDark else OnsiteLight, content = content)
+}

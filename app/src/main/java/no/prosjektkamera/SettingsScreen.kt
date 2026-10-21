@@ -78,6 +78,16 @@ fun SettingsScreen(store: PhotoStore, onClose: () -> Unit) {
         },
     ) { padding ->
         Column(Modifier.fillMaxSize().padding(padding).verticalScroll(rememberScrollState())) {
+            Section(stringResource(R.string.section_appearance))
+            Choices(
+                stringResource(R.string.theme), null,
+                listOf(
+                    stringResource(R.string.theme_system) to (s.theme == "system"),
+                    stringResource(R.string.theme_light) to (s.theme == "light"),
+                    stringResource(R.string.theme_dark) to (s.theme == "dark"),
+                ),
+            ) { s.theme = listOf("system", "light", "dark")[it] }
+
             // Per-app language needs Android 13+; older phones just follow the system.
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
                 Section(stringResource(R.string.section_language))
