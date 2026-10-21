@@ -219,4 +219,15 @@
     <string name="theme_system">System</string>
     <string name="theme_light">Lys</string>
     <string name="theme_dark">Mørk</string>
+    <string name="export_to_folder">Eksporter til mappe …</string>
+    <string name="share_zip">Del som ZIP</string>
+    <string name="exporting">Eksporterer …</string>
+    <string name="export_failed">Kunne ikke eksportere til den mappen. Prøv «Del som ZIP» i stedet.</string>
+    <string name="notes_file_name">Notater.txt</string>
+    <string name="folder_note_heading">Mappenotat</string>
+    <plurals name="exported_n">
+        <item quantity="one">Eksporterte %d fil</item>
+        <item quantity="other">Eksporterte %d filer</item>
+    </plurals>
+    <string name="export_inside_onsite">Velg en mappe utenfor Onsites egen lagringsmappe</string>
 </resources>

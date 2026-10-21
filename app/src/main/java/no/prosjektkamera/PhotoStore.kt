@@ -96,6 +96,14 @@ class PhotoStore(private val context: Context) {
         return true
     }
 
+    /** True if [tree] is Onsite's own storage folder or inside it (exporting there would duplicate files). */
+    fun isInsideStorage(tree: Uri): Boolean {
+        val own = treeUri ?: return false
+        if (tree.authority != own.authority) return false
+        val id = DocumentsContract.getTreeDocumentId(tree)
+        return id == rootDocId || id.startsWith("$rootDocId/")
+    }
+
     /** Human-readable location of the storage folder, e.g. "Pictures › Onsite". */
     val locationLabel: String?
         get() = treeUri?.let { DocumentsContract.getTreeDocumentId(it).substringAfter(':').replace("/", " › ") }
@@ -633,6 +641,9 @@ class PhotoStore(private val context: Context) {
         private val SIDECAR_SUFFIXES = listOf(".notat.txt", ".adresse.txt")
         const val TRASH_DAYS = 30
         private const val WARM_THUMBS = 30
+
+        /** Where the export picker opens: Documents, so it doesn't start inside Onsite's own folder. */
+        fun exportStartUri(): Uri = DocumentsContract.buildDocumentUri(EXTERNAL_STORAGE_AUTHORITY, "primary:Documents")
 
         /** Where the folder picker should open: Pictures/Onsite (created if possible), else Pictures. */
         fun suggestedStartUri(): Uri {

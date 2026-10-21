@@ -49,6 +49,10 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.ListItem
+import androidx.compose.material3.LinearProgressIndicator
+import androidx.compose.ui.window.DialogProperties
+import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.material3.ListItemDefaults
 import androidx.compose.material3.FloatingActionButton
 import androidx.compose.material3.MaterialTheme
@@ -137,11 +141,58 @@ fun FolderScreen(
     }
 
     var selected by remember(folder) { mutableStateOf(setOf<Doc>()) }
+
+    fun toast(msg: String) = Toast.makeText(context, msg, Toast.LENGTH_SHORT).show()
+
+    // ---- Export (to a picked folder, or as a ZIP) ----
+    val exporter = remember { Exporter(context.applicationContext, store) }
+    var exportProgress by remember { mutableStateOf<Pair<Int, Int>?>(null) }
+    var pendingExport by remember { mutableStateOf<List<Doc>>(emptyList()) }
+    var selectionMenuOpen by remember { mutableStateOf(false) }
+
+    fun zipAndShare(items: List<Doc>, name: String) = scope.launch {
+        exportProgress = 0 to 0
+        val zip = withContext(Dispatchers.IO) {
+            val total = exporter.count(items)
+            exportProgress = 0 to total
+            runCatching { exporter.zip(items, name) { done -> exportProgress = done to total } }.getOrNull()
+        }
+        exportProgress = null
+        if (zip == null) toast(context.getString(R.string.error)) else context.shareZip(zip)
+    }
+
+    val exportPicker = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocumentTree()) { tree ->
+        val items = pendingExport
+        if (tree == null || items.isEmpty()) return@rememberLauncherForActivityResult
+        if (store.isInsideStorage(tree)) {
+            toast(context.getString(R.string.export_inside_onsite))
+            return@rememberLauncherForActivityResult
+        }
+        scope.launch {
+            exportProgress = 0 to 0
+            val result = withContext(Dispatchers.IO) {
+                val total = exporter.count(items)
+                exportProgress = 0 to total
+                runCatching { exporter.exportToTree(tree, items) { done -> exportProgress = done to total } }
+            }
+            exportProgress = null
+            result.onSuccess { n -> toast(context.resources.getQuantityString(R.plurals.exported_n, n, n)) }
+                .onFailure { toast(context.getString(R.string.export_failed)) }
+        }
+    }
+
+    fun exportToFolder(items: List<Doc>) {
+        pendingExport = items
+        exportPicker.launch(PhotoStore.exportStartUri())
+    }
+
+    /** Name for a ZIP of [items]: the folder's own name if it's a single folder, else the current folder. */
+    fun zipName(items: List<Doc>) = items.singleOrNull()?.takeIf { it.isDirectory }?.name
+        ?: folder.name.ifEmpty { "Onsite" }
     val selecting = selected.isNotEmpty()
     var dialog by remember { mutableStateOf<FolderDialog?>(null) }
     var menuOpen by remember { mutableStateOf(false) }
 
-    fun toast(msg: String) = Toast.makeText(context, msg, Toast.LENGTH_SHORT).show()
 
     Scaffold(
         topBar = {
@@ -199,6 +250,22 @@ fun FolderScreen(
                         IconButton(onClick = { dialog = FolderDialog.DeletePhotos }) {
                             Icon(Icons.Default.Delete, stringResource(R.string.delete))
                         }
+                        Box {
+                            IconButton(onClick = { selectionMenuOpen = true }) {
+                                Icon(Icons.Default.MoreVert, stringResource(R.string.more))
+                            }
+                            DropdownMenu(expanded = selectionMenuOpen, onDismissRequest = { selectionMenuOpen = false }) {
+                                DropdownMenuItem(
+                                    text = { Text(stringResource(R.string.export_to_folder)) },
+                                    onClick = { selectionMenuOpen = false; exportToFolder(selected.toList()) })
+                                DropdownMenuItem(
+                                    text = { Text(stringResource(R.string.share_zip)) },
+                                    onClick = {
+                                        selectionMenuOpen = false
+                                        selected.toList().let { zipAndShare(it, zipName(it)) }
+                                    })
+                            }
+                        }
                     } else {
                         // At the root, new projects are created with the floating button instead.
                         if (!isRoot) {
@@ -223,6 +290,12 @@ fun FolderScreen(
                                         text = { Text(stringResource(R.string.share_all_here)) },
                                         enabled = photos.isNotEmpty(),
                                         onClick = { menuOpen = false; context.shareDocs(store, photos) })
+                                    DropdownMenuItem(
+                                        text = { Text(stringResource(R.string.export_to_folder)) },
+                                        onClick = { menuOpen = false; exportToFolder(listOf(folder)) })
+                                    DropdownMenuItem(
+                                        text = { Text(stringResource(R.string.share_zip)) },
+                                        onClick = { menuOpen = false; zipAndShare(listOf(folder), folder.name) })
                                     DropdownMenuItem(
                                         text = { Text(stringResource(R.string.rename)) },
                                         onClick = { menuOpen = false; dialog = FolderDialog.Rename })
@@ -383,6 +456,29 @@ fun FolderScreen(
     }
 
     if (recordingAudio) AudioRecordDialog(store, folder) { recordingAudio = false }
+    exportProgress?.let { (done, total) ->
+        AlertDialog(
+            onDismissRequest = {},
+            properties = DialogProperties(dismissOnBackPress = false, dismissOnClickOutside = false),
+            confirmButton = {},
+            title = { Text(stringResource(R.string.exporting)) },
+            text = {
+                Column {
+                    LinearProgressIndicator(
+                        progress = { if (total > 0) done / total.toFloat() else 0f },
+                        modifier = Modifier.fillMaxWidth(),
+                    )
+                    if (total > 0) {
+                        Text(
+                            stringResource(R.string.position, done, total),
+                            modifier = Modifier.padding(top = 8.dp),
+                            style = MaterialTheme.typography.bodySmall,
+                        )
+                    }
+                }
+            },
+        )
+    }
     noteFor?.let { NoteDialog(store, it) { noteFor = null } }
 
     when (dialog) {

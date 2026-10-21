@@ -220,4 +220,15 @@
     <string name="theme_system">System</string>
     <string name="theme_light">Light</string>
     <string name="theme_dark">Dark</string>
+    <string name="export_to_folder">Export to folder…</string>
+    <string name="share_zip">Share as ZIP</string>
+    <string name="exporting">Exporting…</string>
+    <string name="export_failed">Couldn\'t export to that folder. Try “Share as ZIP” instead.</string>
+    <string name="notes_file_name">Notes.txt</string>
+    <string name="folder_note_heading">Folder note</string>
+    <plurals name="exported_n">
+        <item quantity="one">Exported %d file</item>
+        <item quantity="other">Exported %d files</item>
+    </plurals>
+    <string name="export_inside_onsite">Choose a folder outside Onsite\'s own storage folder</string>
 </resources>

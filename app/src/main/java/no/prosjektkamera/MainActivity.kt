@@ -156,6 +156,15 @@ fun StorageAccessScreen(store: PhotoStore) {
     }
 }
 
+/** Shares an exported ZIP from the app cache. */
+fun Context.shareZip(file: java.io.File) {
+    val uri = androidx.core.content.FileProvider.getUriForFile(this, "$packageName.files", file)
+    val intent = Intent(Intent.ACTION_SEND).setType("application/zip").putExtra(Intent.EXTRA_STREAM, uri)
+        .addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+    intent.clipData = ClipData.newRawUri(null, uri)
+    startActivity(Intent.createChooser(intent, getString(R.string.share)))
+}
+
 /** Shares documents with other apps; works for one or many, with read access granted to the receiver. */
 fun Context.shareDocs(store: PhotoStore, docs: List<Doc>) {
     if (docs.isEmpty()) return
