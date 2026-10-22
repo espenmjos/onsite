@@ -14,8 +14,8 @@ android {
         applicationId = "no.prosjektkamera"
         minSdk = 26
         targetSdk = 34
-        versionCode = 8
-        versionName = "1.4.1"
+        versionCode = 9
+        versionName = "1.4.2"
     }
 
     // Release signing key lives outside the repo. Point ONSITE_SIGNING at a properties

@@ -307,7 +307,6 @@ fun FolderScreen(
                     }
                 },
             )
-            if (!isRoot) Breadcrumb(folder, onNavigate = onOpenFolder)
           }
         },
         floatingActionButton = {
@@ -349,6 +348,10 @@ fun FolderScreen(
             horizontalArrangement = Arrangement.spacedBy(4.dp),
             verticalArrangement = Arrangement.spacedBy(4.dp),
         ) {
+            // The path scrolls away with the content instead of covering the photos.
+            if (!isRoot) {
+                item(key = "crumb", span = { GridItemSpan(maxLineSpan) }) { Breadcrumb(folder, onNavigate = onOpenFolder) }
+            }
             folderInfo?.let { info ->
                 item(key = "header", span = { GridItemSpan(maxLineSpan) }) {
                     FolderHeader(info, folderNote) { noteFor = folder }
@@ -553,6 +556,7 @@ fun FolderScreen(
 /**
  * "Projects › 111070 NorMec - Befaring › Elektro": every step is tappable. Scrolls
  * sideways when the path is long, and always starts scrolled to the current folder.
+ * Sits at the top of the content, so it scrolls away with the photos.
  */
 @Composable
 private fun Breadcrumb(folder: Doc, onNavigate: (Doc) -> Unit) {
@@ -589,7 +593,6 @@ private fun Breadcrumb(folder: Doc, onNavigate: (Doc) -> Unit) {
             )
         }
     }
-    HorizontalDivider()
 }
 
 @Composable
