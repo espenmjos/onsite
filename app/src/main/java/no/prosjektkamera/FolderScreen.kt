@@ -49,6 +49,11 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.ListItem
+import androidx.compose.material3.HorizontalDivider
+import androidx.compose.foundation.horizontalScroll
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.layout.widthIn
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.ui.window.DialogProperties
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -196,6 +201,7 @@ fun FolderScreen(
 
     Scaffold(
         topBar = {
+          Column {
             TopAppBar(
                 colors = if (selecting) TopAppBarDefaults.topAppBarColors(
                     containerColor = MaterialTheme.colorScheme.secondaryContainer
@@ -214,21 +220,14 @@ fun FolderScreen(
                     if (selecting) {
                         Text(pluralStringResource(R.plurals.n_selected, selected.size, selected.size))
                     } else {
-                        Column {
-                            Text(
-                                if (isRoot) stringResource(R.string.projects) else folder.name,
-                                maxLines = 1, overflow = TextOverflow.Ellipsis
-                            )
-                            val parent = folder.parent.path
-                            if (!isRoot && parent.isNotEmpty()) {
-                                Text(
-                                    parent.replace("/", " › "),
-                                    style = MaterialTheme.typography.labelMedium,
-                                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                                    maxLines = 1, overflow = TextOverflow.Ellipsis
-                                )
-                            }
-                        }
+                        val title = if (isRoot) stringResource(R.string.projects) else folder.name
+                        // Long project names (order number + customer + site) get two lines and a smaller size.
+                        Text(
+                            title,
+                            maxLines = 2, overflow = TextOverflow.Ellipsis,
+                            style = if (title.length > 22) MaterialTheme.typography.titleMedium
+                            else MaterialTheme.typography.titleLarge,
+                        )
                     }
                 },
                 actions = {
@@ -308,6 +307,8 @@ fun FolderScreen(
                     }
                 },
             )
+            if (!isRoot) Breadcrumb(folder, onNavigate = onOpenFolder)
+          }
         },
         floatingActionButton = {
             if (selecting) return@Scaffold
@@ -549,6 +550,48 @@ fun FolderScreen(
     }
 }
 
+/**
+ * "Projects › 111070 NorMec - Befaring › Elektro": every step is tappable. Scrolls
+ * sideways when the path is long, and always starts scrolled to the current folder.
+ */
+@Composable
+private fun Breadcrumb(folder: Doc, onNavigate: (Doc) -> Unit) {
+    val parts = folder.path.split('/')
+    val steps = listOf(Doc("", true) to stringResource(R.string.projects)) +
+        parts.indices.map { i -> Doc(parts.take(i + 1).joinToString("/"), true) to parts[i] }
+    val scroll = rememberScrollState()
+    LaunchedEffect(folder) { scroll.scrollTo(scroll.maxValue) }
+    LaunchedEffect(scroll.maxValue) { scroll.scrollTo(scroll.maxValue) }
+    Row(
+        Modifier.fillMaxWidth().horizontalScroll(scroll).padding(horizontal = 8.dp, vertical = 2.dp),
+        verticalAlignment = Alignment.CenterVertically,
+    ) {
+        steps.forEachIndexed { i, (doc, label) ->
+            val current = i == steps.lastIndex
+            if (i > 0) {
+                Icon(
+                    Icons.Default.ChevronRight, null,
+                    tint = MaterialTheme.colorScheme.onSurfaceVariant,
+                    modifier = Modifier.size(16.dp),
+                )
+            }
+            Text(
+                label,
+                style = MaterialTheme.typography.labelLarge,
+                fontWeight = if (current) FontWeight.Bold else FontWeight.Normal,
+                color = if (current) MaterialTheme.colorScheme.primary else MaterialTheme.colorScheme.onSurfaceVariant,
+                maxLines = 1,
+                modifier = Modifier.clip(MaterialTheme.shapes.small)
+                    .clickable(enabled = !current) { onNavigate(doc) }
+                    .widthIn(max = 220.dp)
+                    .padding(horizontal = 6.dp, vertical = 8.dp),
+                overflow = TextOverflow.Ellipsis,
+            )
+        }
+    }
+    HorizontalDivider()
+}
+
 @Composable
 private fun FolderHeader(info: PhotoStore.FolderInfo, note: String?, onEditNote: () -> Unit) {
     Column(
@@ -623,7 +666,7 @@ private fun FolderRow(
                 }
             }
         },
-        headlineContent = { Text(dir.name, maxLines = 1, overflow = TextOverflow.Ellipsis) },
+        headlineContent = { Text(dir.name, maxLines = 2, overflow = TextOverflow.Ellipsis) },
         supportingContent = {
             Column {
                 val context = LocalContext.current
